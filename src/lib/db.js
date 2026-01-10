@@ -4,7 +4,7 @@ import mysql from 'mysql2/promise';
 const dbConfig = {
   host: process.env.DATABASE_HOST || 'localhost',
   user: process.env.DATABASE_USER || 'root',
-  password: process.env.DATABASE_PASSWORD || '',
+  password: process.env.DATABASE_PASSWORD || 'bow0923851932',
   database: process.env.DATABASE_NAME || 'PARKING',
   waitForConnections: true,
   connectionLimit: 10,
