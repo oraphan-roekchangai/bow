@@ -265,7 +265,7 @@ export default function Login() {
             </div>
           )}
 
-          <form className="space-y-5" onSubmit={handleSubmit}>
+          <form className="space-y-5" onSubmit={handleSubmit} autoComplete="off">
             {activeTab === "LOGIN" ? (
               <>
                 {/* Login Form */}
@@ -274,6 +274,8 @@ export default function Login() {
                   <label className="mb-1 block text-sm font-medium text-gray-700">Username</label>
                   <input
                     type="text"
+                    name="login_username"
+                    autoComplete="off"
                     placeholder="Enter your username"
                     value={loginData.username}
                     onChange={(e) => handleLoginInputChange("username", e.target.value)}
@@ -293,6 +295,8 @@ export default function Login() {
                   </div>
                   <input
                     type="password"
+                    name="login_password"
+                    autoComplete="new-password"
                     placeholder="Create a password"
                     value={loginData.password}
                     onChange={(e) => handleLoginInputChange("password", e.target.value)}
@@ -332,6 +336,8 @@ export default function Login() {
                   <label className="mb-1 block text-sm font-medium text-gray-700">Username</label>
                   <input
                     type="text"
+                    name="signup_username"
+                    autoComplete="off"
                     placeholder="Enter your username"
                     value={signupData.username}
                     onChange={(e) => handleSignupInputChange("username", e.target.value)}
@@ -401,6 +407,8 @@ export default function Login() {
                   <label className="mb-1 block text-sm font-medium text-gray-700">Password</label>
                   <input
                     type="password"
+                    name="signup_password"
+                    autoComplete="new-password"
                     placeholder="Create a password"
                     value={signupData.password}
                     onChange={(e) => handleSignupInputChange("password", e.target.value)}

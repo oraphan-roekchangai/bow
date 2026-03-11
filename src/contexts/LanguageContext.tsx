@@ -55,6 +55,7 @@ const translations: Record<Language, Record<string, string>> = {
     
     // Sidebar
     'sidebar.dashboard': 'Dashboard',
+    'sidebar.parkingRecords': 'Parking Records',
     'sidebar.userManagement': 'User Management',
     'sidebar.adminManagement': 'Admin Management',
     'sidebar.gateControlling': 'Gate Controlling',
@@ -180,6 +181,7 @@ const translations: Record<Language, Record<string, string>> = {
     
     // Sidebar
     'sidebar.dashboard': 'แดชบอร์ด',
+    'sidebar.parkingRecords': 'ประวัติการจอดรถ',
     'sidebar.userManagement': 'จัดการผู้ใช้',
     'sidebar.adminManagement': 'จัดการผู้ดูแลระบบ',
     'sidebar.gateControlling': 'ควบคุมประตู',

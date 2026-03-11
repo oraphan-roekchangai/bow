@@ -295,6 +295,15 @@ export default function UserManagement() {
               <span>{t('sidebar.dashboard')}</span>
             </a>
             <a
+              href="/parking-records"
+              className="flex items-center space-x-3 text-gray-600 hover:text-gray-800 hover:bg-gray-100 p-3 rounded-lg"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17h6m-6-4h6m2 8H7a2 2 0 01-2-2V7a2 2 0 012-2h5l5 5v9a2 2 0 01-2 2z" />
+              </svg>
+              <span>{t('sidebar.parkingRecords')}</span>
+            </a>
+            <a
               href="/user-management"
               className="flex items-center space-x-3 text-white bg-green-600 p-3 rounded-lg"
             >

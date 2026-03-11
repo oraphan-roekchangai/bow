@@ -150,7 +150,7 @@ export default function Dashboard() {
     }
 
     try {
-  await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
+      await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
     } catch (error) {
       console.error('Logout error:', error);
     } finally {
@@ -373,6 +373,12 @@ export default function Dashboard() {
               </svg>
               <span>{t('sidebar.dashboard')}</span>
             </a>
+            <a href="/parking-records" className="flex items-center space-x-3 text-gray-600 hover:text-gray-800 hover:bg-gray-100 p-3 rounded-lg">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17h6m-6-4h6m2 8H7a2 2 0 01-2-2V7a2 2 0 012-2h5l5 5v9a2 2 0 01-2 2z" />
+              </svg>
+              <span>{t('sidebar.parkingRecords')}</span>
+            </a>
             <a href="/user-management" className="flex items-center space-x-3 text-gray-600 hover:text-gray-800 hover:bg-gray-100 p-3 rounded-lg">
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
@@ -432,7 +438,7 @@ export default function Dashboard() {
         {/* Left Sidebar - Table and Parking Status Cards */}
         <div className="w-96 p-6 space-y-4 flex flex-col">
           {/* Recent Parking Records Table */}
-          <div className="bg-white rounded-2xl shadow-lg overflow-hidden border-2 border-blue-400 flex-shrink-0" style={{ maxHeight: '35vh' }}>
+          <div className="bg-white rounded-2xl shadow-lg overflow-hidden border-2 border-blue-400 flex-shrink-0" style={{ height: '35vh' }}>
             <div className="overflow-auto h-full">
               {recordsLoading ? (
                 <div className="text-center py-8">
@@ -493,146 +499,91 @@ export default function Dashboard() {
           {/* Parking Status Cards - Scrollable if needed */}
           <div className="flex-1 space-y-4 overflow-y-auto">
           {/* 1st Floor VIP */}
-          <div className="bg-green-700 rounded-2xl p-8 relative shadow-lg">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-2xl font-bold text-white mb-4">{t('parking.floor1vip')}</h3>
-              <p className="text-2xl font-bold text-white mb-4">{parkingData.floor1VIP.used}/{parkingData.floor1VIP.total}</p>
+          <div className="bg-green-700 rounded-2xl p-4 relative shadow-lg">
+            <div className="flex items-center justify-between mb-1">
+              <h3 className="text-xl font-bold text-white mb-4">{t('parking.floor1vip')}</h3>
+              <p className="text-xl font-bold text-white mb-4">{parkingData.floor1VIP.used}/{parkingData.floor1VIP.total}</p>
             </div>
             <div className="relative">
               {/* Progress Bar Background */}
-              <div className="h-3 bg-white rounded-full overflow-hidden shadow">
+              <div className="h-2 bg-white rounded-full overflow-hidden shadow">
                 {/* Progress Bar Fill */}
                 <div 
                   className="h-full bg-yellow-400 rounded-full transition-all duration-500"
                   style={{ width: `${calculatePercentage(parkingData.floor1VIP.used, parkingData.floor1VIP.total)}%` }}
                 ></div>
               </div>
-              {/* Car Icon */}
-              <div 
-                className="absolute -top-8 transition-all duration-500"
-                style={{ left: `calc(${calculatePercentage(parkingData.floor1VIP.used, parkingData.floor1VIP.total)}% - 50px)` }}
-              >
-                <img 
-                  src="/image-1760583301290.png" 
-                  alt="Car" 
-                  className="w-20 h-auto"
-                />
-              </div>
             </div>
           </div>
 
           {/* 1st Floor Member */}
-          <div className="bg-blue-400 rounded-2xl p-8 relative shadow-lg">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-2xl font-bold text-gray-900 mb-4">{t('parking.floor1')}</h3>
-              <p className="text-2xl font-bold text-gray-900 mb-4">{parkingData.floor1Member.used}/{parkingData.floor1Member.total}</p>
+          <div className="bg-blue-400 rounded-2xl p-4 relative shadow-lg">
+            <div className="flex items-center justify-between mb-1">
+              <h3 className="text-xl font-bold text-gray-900 mb-4">{t('parking.floor1')}</h3>
+              <p className="text-xl font-bold text-gray-900 mb-4">{parkingData.floor1Member.used}/{parkingData.floor1Member.total}</p>
             </div>
             <div className="relative">
               {/* Progress Bar Background */}
-              <div className="h-3 bg-white rounded-full overflow-hidden shadow">
+              <div className="h-2 bg-white rounded-full overflow-hidden shadow">
                 {/* Progress Bar Fill */}
                 <div 
                   className="h-full bg-green-400 rounded-full transition-all duration-500"
                   style={{ width: `${calculatePercentage(parkingData.floor1Member.used, parkingData.floor1Member.total)}%` }}
                 ></div>
               </div>
-              {/* Car Icon */}
-              <div 
-                className="absolute -top-8 transition-all duration-500"
-                style={{ left: `calc(${calculatePercentage(parkingData.floor1Member.used, parkingData.floor1Member.total)}% - 50px)` }}
-              >
-                <img 
-                  src="/image-1760583301290.png" 
-                  alt="Car" 
-                  className="w-20 h-auto"
-                />
-              </div>
             </div>
           </div>
 
           {/* 2nd Floor */}
-          <div className="bg-blue-400 rounded-2xl p-8 relative shadow-lg">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-2xl font-bold text-gray-900 mb-4">{t('parking.floor2')}</h3>
-              <p className="text-2xl font-bold text-gray-900 mb-4">{parkingData.floor2.used}/{parkingData.floor2.total}</p>
+          <div className="bg-blue-400 rounded-2xl p-4 relative shadow-lg">
+            <div className="flex items-center justify-between mb-1">
+              <h3 className="text-xl font-bold text-gray-900 mb-4">{t('parking.floor2')}</h3>
+              <p className="text-xl font-bold text-gray-900 mb-4">{parkingData.floor2.used}/{parkingData.floor2.total}</p>
             </div>
             <div className="relative">
               {/* Progress Bar Background */}
-              <div className="h-3 bg-white rounded-full overflow-hidden shadow">
+              <div className="h-2 bg-white rounded-full overflow-hidden shadow">
                 {/* Progress Bar Fill */}
                 <div 
                   className="h-full bg-green-400 rounded-full transition-all duration-500"
                   style={{ width: `${calculatePercentage(parkingData.floor2.used, parkingData.floor2.total)}%` }}
                 ></div>
               </div>
-              {/* Car Icon */}
-              <div 
-                className="absolute -top-8 transition-all duration-500"
-                style={{ left: `calc(${calculatePercentage(parkingData.floor2.used, parkingData.floor2.total)}% - 50px)` }}
-              >
-                <img 
-                  src="/image-1760583301290.png" 
-                  alt="Car" 
-                  className="w-20 h-auto"
-                />
-              </div>
             </div>
           </div>
 
           {/* 3rd Floor */}
-          <div className="bg-blue-400 rounded-2xl p-8 relative shadow-lg">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-2xl font-bold text-gray-900 mb-4">{t('parking.floor3')}</h3>
-              <p className="text-2xl font-bold text-gray-900 mb-4">{parkingData.floor3.used}/{parkingData.floor3.total}</p>
+          <div className="bg-blue-400 rounded-2xl p-4 relative shadow-lg">
+            <div className="flex items-center justify-between mb-1">
+              <h3 className="text-xl font-bold text-gray-900 mb-4">{t('parking.floor3')}</h3>
+              <p className="text-xl font-bold text-gray-900 mb-4">{parkingData.floor3.used}/{parkingData.floor3.total}</p>
             </div>
             <div className="relative">
               {/* Progress Bar Background */}
-              <div className="h-3 bg-white rounded-full overflow-hidden shadow">
+              <div className="h-2 bg-white rounded-full overflow-hidden shadow">
                 {/* Progress Bar Fill */}
                 <div 
                   className="h-full bg-green-400 rounded-full transition-all duration-500"
                   style={{ width: `${calculatePercentage(parkingData.floor3.used, parkingData.floor3.total)}%` }}
                 ></div>
               </div>
-              {/* Car Icon */}
-              <div 
-                className="absolute -top-8 transition-all duration-500"
-                style={{ left: `calc(${calculatePercentage(parkingData.floor3.used, parkingData.floor3.total)}% - 50px)` }}
-              >
-                <img 
-                  src="/image-1760583301290.png" 
-                  alt="Car" 
-                  className="w-20 h-auto"
-                />
-              </div>
             </div>
           </div>
 
           {/* 4th Floor */}
-          <div className="bg-blue-400 rounded-2xl p-8 relative shadow-lg">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-2xl font-bold text-gray-900 mb-4">{t('parking.floor4')}</h3>
-              <p className="text-2xl font-bold text-gray-900 mb-4">{parkingData.floor4.used}/{parkingData.floor4.total}</p>
+          <div className="bg-blue-400 rounded-2xl p-4 relative shadow-lg">
+            <div className="flex items-center justify-between mb-1">
+              <h3 className="text-xl font-bold text-gray-900 mb-4">{t('parking.floor4')}</h3>
+              <p className="text-xl font-bold text-gray-900 mb-4">{parkingData.floor4.used}/{parkingData.floor4.total}</p>
             </div>
             <div className="relative">
               {/* Progress Bar Background */}
-              <div className="h-3 bg-white rounded-full overflow-hidden shadow">
+              <div className="h-2 bg-white rounded-full overflow-hidden shadow">
                 {/* Progress Bar Fill */}
                 <div 
                   className="h-full bg-green-400 rounded-full transition-all duration-500"
                   style={{ width: `${calculatePercentage(parkingData.floor4.used, parkingData.floor4.total)}%` }}
                 ></div>
-              </div>
-              {/* Car Icon */}
-              <div 
-                className="absolute -top-8 transition-all duration-500"
-                style={{ left: `calc(${calculatePercentage(parkingData.floor4.used, parkingData.floor4.total)}% - 50px)` }}
-              >
-                <img 
-                  src="/image-1760583301290.png" 
-                  alt="Car" 
-                  className="w-20 h-auto"
-                />
               </div>
             </div>
           </div>
@@ -664,7 +615,7 @@ export default function Dashboard() {
           )}
 
           {/* Chart Type Toggle */}
-          <div className="flex justify-end mb-4">
+          <div className="flex justify-center mb-4">
             <div className="bg-white rounded-lg shadow-sm p-1 flex gap-1">
               <button
                 onClick={() => setChartType('line')}
