@@ -54,12 +54,12 @@ export default function Dashboard() {
     (async () => {
       try {
         const res = await fetch("/api/admin/auth/me", { credentials: "include", cache: "no-store" });
-        if (!res.ok) { router.replace("/pop"); return; }
+        if (!res.ok) { router.replace("/login"); return; }
         const { admin = {} } = await res.json();
         setAdminName(admin.fullName || admin.username || "Admin");
         setAdminId(admin.admin_id || admin.id || null);
       } catch {
-        router.replace("/pop");
+        router.replace("/login");
       }
     })();
   }, [router]);

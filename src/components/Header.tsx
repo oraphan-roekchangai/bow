@@ -165,14 +165,14 @@ export default function Header({ adminName, adminId, currentDate, onDateChange, 
     }
 
     try {
-      await fetch('/api/auth/logout', {
+      await fetch('/api/admin/auth/logout', {
         method: 'POST',
         credentials: 'include',
       });
     } catch (error) {
       console.error('Logout error:', error);
     } finally {
-      window.location.href = '/pop';
+      window.location.href = '/admin/login';
     }
   };
 
