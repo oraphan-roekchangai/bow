@@ -232,12 +232,12 @@ export default function Dashboard() {
                   <tbody>
                     {parkingRecords.length > 0 ? parkingRecords.map((r, i) => (
                       <tr key={r.id} className={`border-b border-gray-200 hover:bg-gray-50 ${i % 2 === 0 ? "bg-white" : "bg-gray-50"}`}>
-                        <td className="px-4 py-3 text-sm font-medium">{new Date(r.entry_time).toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" })}</td>
-                        <td className="px-4 py-3 text-sm font-medium">{r.detected_plate}</td>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">{new Date(r.entry_time).toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" })}</td>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">{r.detected_plate}</td>
                         <td className="px-4 py-3 text-center"><div className="flex justify-center"><div className={`w-4 h-4 rounded-full ${r.exit_time ? "bg-red-500" : "bg-green-500"}`} /></div></td>
                       </tr>
                     )) : (
-                      <tr><td colSpan={3} className="px-4 py-6 text-center text-gray-900 text-sm">{t("table.noRecords")}</td></tr>
+                      <tr><td colSpan={3} className="px-4 py-6 text-center text-gray-500 text-sm">{t("table.noRecords")}</td></tr>
                     )}
                   </tbody>
                 </table>
@@ -248,7 +248,7 @@ export default function Dashboard() {
           {/* Floor status cards */}
           <div className="flex-1 space-y-4 overflow-y-auto">
             {[
-              { label: t("parking.floor1vip"),  data: parkingData.floor1VIP,    bg: "bg-green-400", textColor: "text-gray-900",     barColor: "bg-yellow-400" },
+              { label: t("parking.floor1vip"),  data: parkingData.floor1VIP,    bg: "bg-gray-900", textColor: "text-yellow-400",     barColor: "bg-yellow-400" },
               { label: t("parking.floor1"),     data: parkingData.floor1Member, bg: "bg-blue-400",  textColor: "text-gray-900",  barColor: "bg-green-400" },
               { label: t("parking.floor2"),     data: parkingData.floor2,       bg: "bg-blue-400",  textColor: "text-gray-900",  barColor: "bg-green-400" },
               { label: t("parking.floor3"),     data: parkingData.floor3,       bg: "bg-blue-400",  textColor: "text-gray-900",  barColor: "bg-green-400" },
@@ -272,7 +272,7 @@ export default function Dashboard() {
           {/* Summary */}
           {chartData?.summary && (
             <div className="grid grid-cols-4 gap-4 mb-4">
-              <div className="bg-white rounded-xl p-4 shadow-sm"><div className="text-sm text-gray-500">{t("dashboard.totalRecords")}</div><div className="text-2xl font-bold">{chartData.summary.total_records}</div></div>
+              <div className="bg-white rounded-xl p-4 shadow-sm"><div className="text-sm text-gray-500">{t("dashboard.totalRecords")}</div><div className="text-2xl font-bold text-gray-600">{chartData.summary.total_records}</div></div>
               <div className="bg-white rounded-xl p-4 shadow-sm"><div className="text-sm text-gray-500">{t("dashboard.currentlyParked")}</div><div className="text-2xl font-bold text-green-600">{chartData.summary.currently_parked}</div></div>
               <div className="bg-white rounded-xl p-4 shadow-sm"><div className="text-sm text-gray-500">{t("dashboard.todayEntries")}</div><div className="text-2xl font-bold text-blue-600">{chartData.summary.today_entries}</div></div>
               <div className="bg-white rounded-xl p-4 shadow-sm"><div className="text-sm text-gray-500">{t("dashboard.totalRevenue")}</div><div className="text-2xl font-bold text-teal-600">฿{Number(chartData.summary.total_revenue).toFixed(2)}</div></div>

@@ -193,7 +193,7 @@ export default function Header({ adminName, adminId, currentDate, onDateChange, 
                   type="date"
                   value={currentDate}
                   onChange={(e) => onDateChange(e.target.value)}
-                  className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                  className="px-3 py-2 border border-gray-500 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm font-medium text-gray-700"
                 />
               </div>
             )}

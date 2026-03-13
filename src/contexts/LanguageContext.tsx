@@ -13,7 +13,7 @@ interface LanguageContextType {
 const translations: Record<Language, Record<string, string>> = {
   en: {
     // Header
-    'header.selectDate': 'Select Date',
+    'header.selectDate': 'Date',
     'header.english': 'English',
     'header.thai': 'ไทย',
     'header.admin': 'Admin',
@@ -139,7 +139,7 @@ const translations: Record<Language, Record<string, string>> = {
   },
   th: {
     // Header
-    'header.selectDate': 'เลือกวันที่',
+    'header.selectDate': 'วันที่',
     'header.english': 'English',
     'header.thai': 'ไทย',
     'header.admin': 'ผู้ดูแลระบบ',
