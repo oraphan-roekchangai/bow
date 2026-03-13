@@ -8,14 +8,14 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import {
   Chart as ChartJS,
   CategoryScale, LinearScale, PointElement, LineElement,
-  BarElement, Title, Tooltip, Legend, Filler,
+  BarElement, ArcElement, Title, Tooltip, Legend, Filler,
   ChartOptions, ChartData,
 } from "chart.js";
-import { Line, Bar } from "react-chartjs-2";
+import { Line, Bar, Pie } from "react-chartjs-2";
 
 ChartJS.register(
   CategoryScale, LinearScale, PointElement, LineElement,
-  BarElement, Title, Tooltip, Legend, Filler
+  BarElement, ArcElement, Title, Tooltip, Legend, Filler
 );
 
 interface ParkingRecord {
@@ -25,6 +25,8 @@ interface ParkingRecord {
   exit_time: string | null;
   parking_fee: number | null;
 }
+
+type ChartRange = "hour" | "day" | "week" | "month" | "year";
 
 export default function Dashboard() {
   const [sidebarOpen, setSidebarOpen]   = useState(false);
@@ -36,6 +38,7 @@ export default function Dashboard() {
   const [parkingRecords, setParkingRecords] = useState<ParkingRecord[]>([]);
   const [recordsLoading, setRecordsLoading] = useState(true);
   const [chartType, setChartType]       = useState<"line" | "bar">("line");
+  const [selectedRange, setSelectedRange] = useState<ChartRange>("hour");
   const { t } = useLanguage();
   const router = useRouter();
 
@@ -98,7 +101,15 @@ export default function Dashboard() {
 
   // ── Chart helpers ────────────────────────────────────────────────────────────
 
-  const createLineOptions = (color: string): ChartOptions<"line"> => ({
+  const calcSuggestedMax = (values: number[]) => {
+    const maxVal = Math.max(...values, 0);
+    if (maxVal <= 10) return 12;
+    const padded = maxVal * 1.2;
+    const step = maxVal < 100 ? 5 : maxVal < 500 ? 10 : 50;
+    return Math.ceil(padded / step) * step;
+  };
+
+  const createLineOptions = (color: string, values: number[]): ChartOptions<"line"> => ({
     responsive: true, maintainAspectRatio: false,
     plugins: {
       legend: { display: false },
@@ -106,17 +117,27 @@ export default function Dashboard() {
     },
     scales: {
       x: { grid: { color: "#e5e7eb" }, ticks: { color: "#9ca3af", maxRotation: 0, autoSkip: true, maxTicksLimit: 12 } },
-      y: { beginAtZero: true, grid: { color: "#f3f4f6" }, ticks: { color: "#9ca3af" }, suggestedMax: 160 },
+      y: {
+        beginAtZero: true,
+        grid: { color: "#f3f4f6" },
+        ticks: { color: "#9ca3af", maxTicksLimit: 6, precision: 0 },
+        suggestedMax: calcSuggestedMax(values),
+      },
     },
-    elements: { line: { tension: 0.35, borderWidth: 2 }, point: { radius: 3, hoverRadius: 5, backgroundColor: color } },
+    elements: { line: { tension: 0.35, borderWidth: 2 }, point: { radius: 0, hoverRadius: 0, hitRadius: 12, backgroundColor: color } },
   });
 
-  const createBarOptions = (color: string): ChartOptions<"bar"> => ({
+  const createBarOptions = (color: string, values: number[]): ChartOptions<"bar"> => ({
     responsive: true, maintainAspectRatio: false,
     plugins: { legend: { display: false }, tooltip: { intersect: false, mode: "index", backgroundColor: "#111827", titleColor: "#fff", bodyColor: "#e5e7eb", padding: 10 } },
     scales: {
       x: { grid: { color: "#e5e7eb" }, ticks: { color: "#9ca3af", maxRotation: 0, autoSkip: true, maxTicksLimit: 12 } },
-      y: { beginAtZero: true, grid: { color: "#f3f4f6" }, ticks: { color: "#9ca3af" }, suggestedMax: 160 },
+      y: {
+        beginAtZero: true,
+        grid: { color: "#f3f4f6" },
+        ticks: { color: "#9ca3af", maxTicksLimit: 6, precision: 0 },
+        suggestedMax: calcSuggestedMax(values),
+      },
     },
   });
 
@@ -140,34 +161,98 @@ export default function Dashboard() {
     datasets: [{ label: "Vehicles", data: values, backgroundColor: color, borderColor: color, borderWidth: 1 }],
   });
 
+  const pieOptions: ChartOptions<"pie"> = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { display: false },
+      tooltip: { backgroundColor: "#111827", titleColor: "#fff", bodyColor: "#e5e7eb", padding: 10 },
+    },
+  };
+
+  const floor1PieData = useMemo<ChartData<"pie">>(() => ({
+    labels: [t("parking.floor1vip"), t("parking.floor1")],
+    datasets: [{
+      data: [parkingData.floor1VIP.used, parkingData.floor1Member.used],
+      backgroundColor: ["#f59e0b", "#2563eb"],
+      borderColor: ["#ffffff", "#ffffff"],
+      borderWidth: 2,
+    }],
+  }), [t, parkingData.floor1VIP.used, parkingData.floor1Member.used]);
+
+  const floor2To4PieData = useMemo<ChartData<"pie">>(() => ({
+    labels: [t("parking.floor2"), t("parking.floor3"), t("parking.floor4")],
+    datasets: [{
+      data: [parkingData.floor2.used, parkingData.floor3.used, parkingData.floor4.used],
+      backgroundColor: ["#14b8a6", "#8b5cf6", "#ef4444"],
+      borderColor: ["#ffffff", "#ffffff", "#ffffff"],
+      borderWidth: 2,
+    }],
+  }), [t, parkingData.floor2.used, parkingData.floor3.used, parkingData.floor4.used]);
+
   const dayLabels   = useMemo(() => chartData?.dayData?.map((i: any) => i.label) ?? Array.from({length:24},(_,h)=>`${h}:00`), [chartData]);
   const dayVals     = useMemo(() => chartData?.dayData?.map((i: any) => i.total_entries) ?? Array(24).fill(0), [chartData]);
   const monthLabels = useMemo(() => chartData?.monthData?.map((i: any) => i.label) ?? Array.from({length:31},(_,i)=>String(i+1)), [chartData]);
   const monthVals   = useMemo(() => chartData?.monthData?.map((i: any) => i.total_entries) ?? Array(31).fill(0), [chartData]);
+  const weekLabels  = useMemo(() => {
+    if (chartData?.weekData?.length) return chartData.weekData.map((i: any) => i.label);
+    const chunks = Math.ceil(monthLabels.length / 7);
+    return Array.from({ length: chunks }, (_, i) => `W${i + 1}`);
+  }, [chartData, monthLabels]);
+  const weekVals    = useMemo(() => {
+    if (chartData?.weekData?.length) return chartData.weekData.map((i: any) => i.total_entries);
+    const vals: number[] = [];
+    for (let i = 0; i < monthVals.length; i += 7) {
+      vals.push(monthVals.slice(i, i + 7).reduce((sum: number, n: number) => sum + n, 0));
+    }
+    return vals;
+  }, [chartData, monthVals]);
   const yearLabels  = useMemo(() => chartData?.yearData?.map((i: any) => i.label) ?? ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"], [chartData]);
   const yearVals    = useMemo(() => chartData?.yearData?.map((i: any) => i.total_entries) ?? Array(12).fill(0), [chartData]);
   const myLabels    = useMemo(() => chartData?.multiYearData?.map((i: any) => i.label) ?? [], [chartData]);
   const myVals      = useMemo(() => chartData?.multiYearData?.map((i: any) => i.total_entries) ?? [], [chartData]);
 
-  const dayLineOpts   = useMemo(() => createLineOptions("#123bef"), []);
-  const dayBarOpts    = useMemo(() => createBarOptions("#123bef"), []);
+  const dayLineOpts   = useMemo(() => createLineOptions("#123bef", dayVals), [dayVals]);
+  const dayBarOpts    = useMemo(() => createBarOptions("#123bef", dayVals), [dayVals]);
   const dayLineData   = useMemo(() => createLineData(dayLabels, dayVals, "#123bef"), [dayLabels, dayVals]);
   const dayBarData    = useMemo(() => createBarData(dayLabels, dayVals, "#123bef"), [dayLabels, dayVals]);
 
-  const mthLineOpts   = useMemo(() => createLineOptions("#0d9488"), []);
-  const mthBarOpts    = useMemo(() => createBarOptions("#0d9488"), []);
+  const mthLineOpts   = useMemo(() => createLineOptions("#0d9488", monthVals), [monthVals]);
+  const mthBarOpts    = useMemo(() => createBarOptions("#0d9488", monthVals), [monthVals]);
   const mthLineData   = useMemo(() => createLineData(monthLabels, monthVals, "#0d9488"), [monthLabels, monthVals]);
   const mthBarData    = useMemo(() => createBarData(monthLabels, monthVals, "#0d9488"), [monthLabels, monthVals]);
 
-  const yrLineOpts    = useMemo(() => createLineOptions("#10b981"), []);
-  const yrBarOpts     = useMemo(() => createBarOptions("#10b981"), []);
+  const wkLineOpts    = useMemo(() => createLineOptions("#f59e0b", weekVals), [weekVals]);
+  const wkBarOpts     = useMemo(() => createBarOptions("#f59e0b", weekVals), [weekVals]);
+  const wkLineData    = useMemo(() => createLineData(weekLabels, weekVals, "#f59e0b"), [weekLabels, weekVals]);
+  const wkBarData     = useMemo(() => createBarData(weekLabels, weekVals, "#f59e0b"), [weekLabels, weekVals]);
+
+  const yrLineOpts    = useMemo(() => createLineOptions("#10b981", yearVals), [yearVals]);
+  const yrBarOpts     = useMemo(() => createBarOptions("#10b981", yearVals), [yearVals]);
   const yrLineData    = useMemo(() => createLineData(yearLabels, yearVals, "#10b981"), [yearLabels, yearVals]);
   const yrBarData     = useMemo(() => createBarData(yearLabels, yearVals, "#10b981"), [yearLabels, yearVals]);
 
-  const myLineOpts    = useMemo(() => createLineOptions("#8b5cf6"), []);
-  const myBarOpts     = useMemo(() => createBarOptions("#8b5cf6"), []);
+  const myLineOpts    = useMemo(() => createLineOptions("#8b5cf6", myVals), [myVals]);
+  const myBarOpts     = useMemo(() => createBarOptions("#8b5cf6", myVals), [myVals]);
   const myLineData    = useMemo(() => createLineData(myLabels, myVals, "#8b5cf6"), [myLabels, myVals]);
   const myBarData     = useMemo(() => createBarData(myLabels, myVals, "#8b5cf6"), [myLabels, myVals]);
+
+  const chartViews = useMemo(() => ({
+    hour:  { label: t("dashboard.hour"),  badge: "bg-blue-100 text-blue-700",    lineD: dayLineData, lineO: dayLineOpts, lineColor: "#123bef", barD: dayBarData, barO: dayBarOpts },
+    day:   { label: t("dashboard.day"),   badge: "bg-teal-100 text-teal-700",    lineD: mthLineData, lineO: mthLineOpts, lineColor: "#0d9488", barD: mthBarData, barO: mthBarOpts },
+    week:  { label: t("dashboard.week"),  badge: "bg-amber-100 text-amber-700",  lineD: wkLineData, lineO: wkLineOpts, lineColor: "#f59e0b", barD: wkBarData, barO: wkBarOpts },
+    month: { label: t("dashboard.month"), badge: "bg-green-100 text-green-700",  lineD: yrLineData, lineO: yrLineOpts, lineColor: "#10b981", barD: yrBarData, barO: yrBarOpts },
+    year:  { label: t("dashboard.year"),  badge: "bg-purple-100 text-purple-700",lineD: myLineData, lineO: myLineOpts, lineColor: "#8b5cf6", barD: myBarData, barO: myBarOpts },
+  }), [
+    t,
+    dayLineData, dayLineOpts, dayBarData, dayBarOpts,
+    mthLineData, mthLineOpts, mthBarData, mthBarOpts,
+    wkLineData, wkLineOpts, wkBarData, wkBarOpts,
+    yrLineData, yrLineOpts, yrBarData, yrBarOpts,
+    myLineData, myLineOpts, myBarData, myBarOpts,
+  ]);
+
+  const activeChart = chartViews[selectedRange];
 
   // ── Sidebar nav ──────────────────────────────────────────────────────────────
 
@@ -180,7 +265,7 @@ export default function Dashboard() {
   ];
 
   return (
-    <div className="min-h-screen bg-green-50">
+    <div className="min-h-screen bg-gray-50">
       {/* Sidebar */}
       <div className={`fixed left-0 top-0 h-full w-64 bg-white shadow-lg transform transition-transform duration-300 z-40 ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}`}>
         <div className="p-6">
@@ -201,19 +286,21 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {!sidebarOpen && (
-        <button aria-label="Open sidebar" onClick={() => setSidebarOpen(true)} className="fixed left-0 top-1/2 -translate-y-1/2 z-50 bg-white border border-gray-300 shadow-lg hover:bg-gray-50 flex items-center justify-center rounded-r-lg px-1 py-6">
-          <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
-        </button>
-      )}
-
-      <Header adminName={adminName} adminId={adminId} currentDate={currentDate} onDateChange={setCurrentDate} showDatePicker={true} />
+      <Header
+        adminName={adminName}
+        adminId={adminId}
+        currentDate={currentDate}
+        onDateChange={setCurrentDate}
+        showDatePicker={true}
+        showMenuButton={true}
+        onMenuClick={() => setSidebarOpen(true)}
+      />
 
       <div className="flex h-[calc(100vh-60px)]">
         {/* Left sidebar: table + floor cards */}
-        <div className="w-96 p-6 space-y-4 flex flex-col">
+        <div className="w-96 p-6">
           {/* Recent records table */}
-          <div className="bg-white rounded-2xl shadow-lg overflow-hidden border-2 border-blue-400 flex-shrink-0" style={{ height: "35vh" }}>
+          <div className="bg-white rounded-lg shadow-sm overflow-hidden border-2 border-gray-200" style={{ height: "100%" }}>
             <div className="overflow-auto h-full">
               {recordsLoading ? (
                 <div className="text-center py-8">
@@ -245,71 +332,131 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* Floor status cards */}
-          <div className="flex-1 space-y-4 overflow-y-auto">
-            {[
-              { label: t("parking.floor1vip"),  data: parkingData.floor1VIP,    bg: "bg-gray-900", textColor: "text-yellow-400",     barColor: "bg-yellow-400" },
-              { label: t("parking.floor1"),     data: parkingData.floor1Member, bg: "bg-blue-400",  textColor: "text-gray-900",  barColor: "bg-green-400" },
-              { label: t("parking.floor2"),     data: parkingData.floor2,       bg: "bg-blue-400",  textColor: "text-gray-900",  barColor: "bg-green-400" },
-              { label: t("parking.floor3"),     data: parkingData.floor3,       bg: "bg-blue-400",  textColor: "text-gray-900",  barColor: "bg-green-400" },
-              { label: t("parking.floor4"),     data: parkingData.floor4,       bg: "bg-blue-400",  textColor: "text-gray-900",  barColor: "bg-green-400" },
-            ].map((f) => (
-              <div key={f.label} className={`${f.bg} rounded-2xl p-4 shadow-lg`}>
-                <div className="flex items-center justify-between mb-1">
-                  <h3 className={`text-xl font-bold mb-4 ${f.textColor}`}>{f.label}</h3>
-                  <p className={`text-xl font-bold mb-4 ${f.textColor}`}>{f.data.used}/{f.data.total}</p>
-                </div>
-                <div className="h-2 bg-white rounded-full overflow-hidden shadow">
-                  <div className={`h-full ${f.barColor} rounded-full transition-all duration-500`} style={{ width: `${pct(f.data.used, f.data.total)}%` }} />
-                </div>
-              </div>
-            ))}
-          </div>
         </div>
 
         {/* Right: Charts */}
-        <div className="flex-1 p-5 overflow-y-auto">
+        <div className="flex-1 p-4 overflow-y-auto">
           {/* Summary */}
           {chartData?.summary && (
-            <div className="grid grid-cols-4 gap-4 mb-4">
-              <div className="bg-white rounded-xl p-4 shadow-sm"><div className="text-sm text-gray-500">{t("dashboard.totalRecords")}</div><div className="text-2xl font-bold text-gray-600">{chartData.summary.total_records}</div></div>
-              <div className="bg-white rounded-xl p-4 shadow-sm"><div className="text-sm text-gray-500">{t("dashboard.currentlyParked")}</div><div className="text-2xl font-bold text-green-600">{chartData.summary.currently_parked}</div></div>
-              <div className="bg-white rounded-xl p-4 shadow-sm"><div className="text-sm text-gray-500">{t("dashboard.todayEntries")}</div><div className="text-2xl font-bold text-blue-600">{chartData.summary.today_entries}</div></div>
-              <div className="bg-white rounded-xl p-4 shadow-sm"><div className="text-sm text-gray-500">{t("dashboard.totalRevenue")}</div><div className="text-2xl font-bold text-teal-600">฿{Number(chartData.summary.total_revenue).toFixed(2)}</div></div>
+            <div className="bg-white rounded-lg p-3 shadow-sm mb-4">
+              <div className="grid grid-cols-4 gap-3">
+                <div className="bg-gray-50 rounded-lg p-3 border border-gray-200"><div className="text-sm text-gray-800">{t("dashboard.totalRecords")}</div><div className="text-xl font-bold text-gray-600">{chartData.summary.total_records}</div></div>
+                <div className="bg-gray-50 rounded-lg p-3 border border-gray-200"><div className="text-sm text-gray-800">{t("dashboard.currentlyParked")}</div><div className="text-xl font-bold text-green-600">{chartData.summary.currently_parked}</div></div>
+                <div className="bg-gray-50 rounded-lg p-3 border border-gray-200"><div className="text-sm text-gray-800">{t("dashboard.todayEntries")}</div><div className="text-xl font-bold text-blue-600">{chartData.summary.today_entries}</div></div>
+                <div className="bg-gray-50 rounded-lg p-3 border border-gray-200"><div className="text-sm text-gray-800">{t("dashboard.totalRevenue")}</div><div className="text-xl font-bold text-teal-600">฿{Number(chartData.summary.total_revenue).toFixed(2)}</div></div>
+              </div>
             </div>
           )}
 
-          {/* Chart type toggle */}
-          <div className="flex justify-center mb-4">
-            <div className="bg-white rounded-lg shadow-sm p-1 flex gap-1">
-              {(["line", "bar"] as const).map((type) => (
-                <button key={type} onClick={() => setChartType(type)}
-                  className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${chartType === type ? "bg-blue-600 text-white shadow-sm" : "text-gray-600 hover:bg-gray-100"}`}>
-                  {type === "line" ? t("dashboard.lineChart") : t("dashboard.barChart")}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {loading ? (
-            <div className="bg-white rounded-xl p-12 shadow-sm text-center text-gray-500">{t("dashboard.loadingData")}</div>
-          ) : (
-            <div className="space-y-4">
+          {/* Floor status cards */}
+          <div className="bg-white rounded-lg p-4 shadow-sm mb-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
               {[
-                { label: t("dashboard.hour"),  badge: "bg-blue-100 text-blue-700",   lineD: dayLineData,  lineO: dayLineOpts,  barD: dayBarData,  barO: dayBarOpts },
-                { label: t("dashboard.day"),   badge: "bg-teal-100 text-teal-700",   lineD: mthLineData,  lineO: mthLineOpts,  barD: mthBarData,  barO: mthBarOpts },
-                { label: t("dashboard.month"), badge: "bg-green-100 text-green-700", lineD: yrLineData,   lineO: yrLineOpts,   barD: yrBarData,   barO: yrBarOpts },
-                { label: t("dashboard.year"),  badge: "bg-purple-100 text-purple-700",lineD: myLineData,   lineO: myLineOpts,   barD: myBarData,   barO: myBarOpts },
-              ].map((chart) => (
-                <div key={chart.label} className="relative bg-white rounded-xl p-6 shadow-sm">
-                  <div className={`absolute top-2 right-2 rounded-full ${chart.badge} text-sm font-semibold px-4 py-1 shadow-sm`}>{chart.label}</div>
-                  <div className="h-56">
-                    {chartType === "line" ? <Line data={chart.lineD} options={chart.lineO} /> : <Bar data={chart.barD} options={chart.barO} />}
+                { label: t("parking.floor1vip"),  data: parkingData.floor1VIP,    dotColor: "bg-yellow-400", barColor: "bg-yellow-400" },
+                { label: t("parking.floor1"),     data: parkingData.floor1Member, dotColor: "bg-blue-500",   barColor: "bg-green-500" },
+                { label: t("parking.floor2"),     data: parkingData.floor2,       dotColor: "bg-blue-500",   barColor: "bg-green-500" },
+                { label: t("parking.floor3"),     data: parkingData.floor3,       dotColor: "bg-blue-500",   barColor: "bg-green-500" },
+                { label: t("parking.floor4"),     data: parkingData.floor4,       dotColor: "bg-blue-500",   barColor: "bg-green-500" },
+              ].map((f) => (
+                <div key={f.label} className="bg-white rounded-lg p-4 border border-gray-200 shadow-sm">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <div className={`w-2.5 h-2.5 rounded-full ${f.dotColor}`} />
+                      <h3 className="text-base font-bold text-gray-800">{f.label}</h3>
+                    </div>
+                    <p className="text-base font-bold text-gray-700">{f.data.used}/{f.data.total}</p>
+                  </div>
+                  <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                    <div className={`h-full ${f.barColor} rounded-full transition-all duration-500`} style={{ width: `${pct(f.data.used, f.data.total)}%` }} />
                   </div>
                 </div>
               ))}
             </div>
-          )}
+          </div>
+
+          {/* Chart controls */}
+          <div className="bg-white rounded-lg p-6 shadow-sm">
+            <div className="flex w-full flex-wrap items-center justify-between gap-3 mb-4">
+              <div className="bg-gray-50 rounded-lg border border-gray-00 p-1 flex gap-1">
+                {(["line", "bar"] as const).map((type) => (
+                  <button key={type} onClick={() => setChartType(type)}
+                    className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${chartType === type ? "bg-blue-600 text-white shadow-sm" : "text-gray-600 hover:bg-gray-100"}`}>
+                    {type === "line" ? t("dashboard.lineChart") : t("dashboard.barChart")}
+                  </button>
+                ))}
+              </div>
+
+              <div className="bg-gray-50 rounded-lg border border-gray-200 p-1 flex gap-1 flex-wrap">
+                {(["hour", "day", "week", "month", "year"] as const).map((range) => (
+                  <button
+                    key={range}
+                    onClick={() => setSelectedRange(range)}
+                    className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${selectedRange === range ? "bg-emerald-600 text-white shadow-sm" : "text-gray-600 hover:bg-gray-100"}`}
+                  >
+                    {chartViews[range].label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {loading ? (
+              <div className="p-8 text-center text-gray-500">{t("dashboard.loadingData")}</div>
+            ) : (
+              <>
+                <div className="h-[250px]">
+                  {chartType === "line"
+                    ? <Line data={activeChart.lineD} options={activeChart.lineO} />
+                    : <Bar data={activeChart.barD} options={activeChart.barO} />}
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* Pie charts by floor groups */}
+          <div className="bg-white rounded-lg p-4 shadow-sm mt-4 mb-4">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <div className="bg-white rounded-lg border border-gray-200 p-4">
+                <h3 className="text-base font-semibold text-gray-800 mb-3">
+                  {t("parking.floor1vip")} + {t("parking.floor1")}
+                </h3>
+                <div className="h-56 mb-4">
+                  <Pie data={floor1PieData} options={pieOptions} />
+                </div>
+                <div className="space-y-2">
+                  {[
+                    { label: t("parking.floor1vip"), color: "bg-amber-500" },
+                    { label: t("parking.floor1"), color: "bg-blue-600" },
+                  ].map((item) => (
+                    <div key={item.label} className="flex items-center gap-2">
+                      <span className={`inline-block w-4 h-4 rounded-sm ${item.color}`} />
+                      <span className="text-sm text-gray-700">{item.label}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="bg-white rounded-lg border border-gray-200 p-4">
+                <h3 className="text-base font-semibold text-gray-800 mb-3">
+                  {t("parking.floor2")}, {t("parking.floor3")}, {t("parking.floor4")}
+                </h3>
+                <div className="h-56 mb-4">
+                  <Pie data={floor2To4PieData} options={pieOptions} />
+                </div>
+                <div className="space-y-2">
+                  {[
+                    { label: t("parking.floor2"), color: "bg-teal-500" },
+                    { label: t("parking.floor3"), color: "bg-violet-500" },
+                    { label: t("parking.floor4"), color: "bg-red-500" },
+                  ].map((item) => (
+                    <div key={item.label} className="flex items-center gap-2">
+                      <span className={`inline-block w-4 h-4 rounded-sm ${item.color}`} />
+                      <span className="text-sm text-gray-700">{item.label}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>

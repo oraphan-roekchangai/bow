@@ -40,7 +40,7 @@ export default function GateControlling() {
   const resetSystem  = () => { setGateStatus({ main: 'CLOSED', vip: 'CLOSED', exit: 'CLOSED' }); setSystemStatus({ camera: 'ONLINE', operation: 'ON' }); };
 
   return (
-    <div className="min-h-screen bg-green-50">
+    <div className="min-h-screen bg-gray-100">
       {/* Sidebar */}
       <div className={`fixed left-0 top-0 h-full w-64 bg-white shadow-lg transform transition-transform duration-300 z-40 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         <div className="p-6">
@@ -61,16 +61,10 @@ export default function GateControlling() {
         </div>
       </div>
 
-      {!sidebarOpen && (
-        <button aria-label="Open sidebar" onClick={() => setSidebarOpen(true)} className="fixed left-0 top-1/2 -translate-y-1/2 z-50 bg-white border border-gray-300 shadow-lg hover:bg-gray-50 flex items-center justify-center rounded-r-lg px-1 py-6">
-          <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M9 5l7 7-7 7" /></svg>
-        </button>
-      )}
-
       <div className="flex flex-col h-screen w-full">
-        <Header adminName={adminName} adminId={adminId} />
+        <Header adminName={adminName} adminId={adminId} showMenuButton={true} onMenuClick={() => setSidebarOpen(true)} />
 
-        <main className="flex-1 overflow-auto bg-gradient-to-br from-green-50 to-blue-50">
+        <main className="flex-1 overflow-auto bg-gray-50">
           <div className="container mx-auto p-8 max-w-6xl">
             <h1 className="text-4xl font-bold text-gray-900 mb-8 text-center">Main Operation Control</h1>
 

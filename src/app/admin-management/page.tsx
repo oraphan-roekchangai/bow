@@ -123,7 +123,7 @@ export default function AdminManagement() {
   };
 
   return (
-    <div className="h-screen bg-green-50 overflow-hidden">
+    <div className="h-screen bg-gray-50 overflow-hidden">
       {/* Sidebar */}
       <div className={`fixed left-0 top-0 h-full w-64 bg-white shadow-lg transform transition-transform duration-300 z-40 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         <div className="p-6">
@@ -144,14 +144,8 @@ export default function AdminManagement() {
         </div>
       </div>
 
-      {!sidebarOpen && (
-        <button aria-label="Open sidebar" onClick={() => setSidebarOpen(true)} className="fixed left-0 top-1/2 -translate-y-1/2 z-50 bg-white border border-gray-300 shadow-lg hover:bg-gray-50 flex items-center justify-center rounded-r-lg px-1 py-6">
-          <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
-        </button>
-      )}
-
       <div className="w-full h-screen flex flex-col">
-        <Header adminName={adminName} adminId={adminId} />
+        <Header adminName={adminName} adminId={adminId} showMenuButton={true} onMenuClick={() => setSidebarOpen(true)} />
 
         <div className="flex-1 p-4 overflow-hidden">
           <div className="bg-white rounded-lg shadow-lg overflow-hidden h-full flex flex-col">

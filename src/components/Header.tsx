@@ -9,9 +9,19 @@ interface HeaderProps {
   currentDate?: string;
   onDateChange?: (date: string) => void;
   showDatePicker?: boolean;
+  showMenuButton?: boolean;
+  onMenuClick?: () => void;
 }
 
-export default function Header({ adminName, adminId, currentDate, onDateChange, showDatePicker = false }: HeaderProps) {
+export default function Header({
+  adminName,
+  adminId,
+  currentDate,
+  onDateChange,
+  showDatePicker = false,
+  showMenuButton = false,
+  onMenuClick,
+}: HeaderProps) {
   const [profileImage, setProfileImage] = useState<string | null>(null);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showAdminMenu, setShowAdminMenu] = useState(false);
@@ -183,8 +193,23 @@ export default function Header({ adminName, adminId, currentDate, onDateChange, 
           
           {/* Left side - Date Picker (if enabled) */}
           <div className="flex items-center">
-            {showDatePicker && currentDate && onDateChange && (
-              <div className="flex items-center space-x-3">
+            <div className="flex items-center space-x-3">
+              {showMenuButton && (
+                <button
+                  type="button"
+                  aria-label="Open sidebar menu"
+                  onClick={onMenuClick}
+                  className="h-10 w-10 rounded-lg bg-white hover:bg-gray-2=100 transition-colors flex items-center justify-center"
+                >
+                  <span className="sr-only">Menu</span>
+                  <svg className="w-7 h-7 text-gray-800" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M5 7h14M5 12h14M5 17h14" />
+                  </svg>
+                </button>
+              )}
+
+              {showDatePicker && currentDate && onDateChange && (
+                <div className="flex items-center space-x-3">
                 <label htmlFor="header-date-picker" className="text-sm font-medium text-gray-700">
                   {t('header.selectDate')}:
                 </label>
@@ -196,7 +221,8 @@ export default function Header({ adminName, adminId, currentDate, onDateChange, 
                   className="px-3 py-2 border border-gray-500 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm font-medium text-gray-700"
                 />
               </div>
-            )}
+              )}
+            </div>
           </div>
 
           {/* Right side - Notification, Language, User */}
