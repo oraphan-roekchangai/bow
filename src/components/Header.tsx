@@ -206,7 +206,7 @@ export default function Header({ adminName, adminId, currentDate, onDateChange, 
               <div className="flex items-center space-x-2 text-sm">
                 <div className="w-7 h-5 rounded-md overflow-hidden shadow-sm border border-gray-300">
                   <img 
-                    src={language === 'en' ? '/uk-flag.svg' : '/th-flag.svg'}
+                    src={language === 'en' ? '/admin/uk-flag.svg' : '/admin/th-flag.svg'}
                     alt={language === 'en' ? 'UK Flag' : 'Thai Flag'}
                     className="w-full h-full object-cover"
                   />
@@ -240,7 +240,7 @@ export default function Header({ adminName, adminId, currentDate, onDateChange, 
                       }`}
                     >
                       <div className="w-6 h-4 rounded overflow-hidden mr-3">
-                        <img src="/uk-flag.svg" alt="UK" className="w-full h-full object-cover" />
+                        <img src="/admin/uk-flag.svg" alt="UK" className="w-full h-full object-cover" />
                       </div>
                       {t('header.english')}
                     </button>
@@ -254,7 +254,7 @@ export default function Header({ adminName, adminId, currentDate, onDateChange, 
                       }`}
                     >
                       <div className="w-6 h-4 rounded overflow-hidden mr-3">
-                        <img src="/th-flag.svg" alt="Thailand" className="w-full h-full object-cover" />
+                        <img src="/admin/th-flag.svg" alt="Thailand" className="w-full h-full object-cover" />
                       </div>
                       {t('header.thai')}
                     </button>

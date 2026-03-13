@@ -56,7 +56,7 @@ export default function Login() {
       <div className="relative hidden md:block p-3">
         <div className="h-[calc(100vh-24px)] w-full overflow-hidden rounded-lg ring-2 ring-blue-400">
           <Image
-            src="/raban-haaijk-wftNpcjCHT4-unsplash.jpg"
+            src="/admin/raban-haaijk-wftNpcjCHT4-unsplash.jpg"
             alt="Parking lot"
             fill
             priority
