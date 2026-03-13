@@ -237,7 +237,7 @@ export default function Dashboard() {
                         <td className="px-4 py-3 text-center"><div className="flex justify-center"><div className={`w-4 h-4 rounded-full ${r.exit_time ? "bg-red-500" : "bg-green-500"}`} /></div></td>
                       </tr>
                     )) : (
-                      <tr><td colSpan={3} className="px-4 py-6 text-center text-gray-500 text-sm">{t("table.noRecords")}</td></tr>
+                      <tr><td colSpan={3} className="px-4 py-6 text-center text-gray-900 text-sm">{t("table.noRecords")}</td></tr>
                     )}
                   </tbody>
                 </table>
@@ -248,7 +248,7 @@ export default function Dashboard() {
           {/* Floor status cards */}
           <div className="flex-1 space-y-4 overflow-y-auto">
             {[
-              { label: t("parking.floor1vip"),  data: parkingData.floor1VIP,    bg: "bg-green-700", textColor: "text-white",     barColor: "bg-yellow-400" },
+              { label: t("parking.floor1vip"),  data: parkingData.floor1VIP,    bg: "bg-green-400", textColor: "text-gray-900",     barColor: "bg-yellow-400" },
               { label: t("parking.floor1"),     data: parkingData.floor1Member, bg: "bg-blue-400",  textColor: "text-gray-900",  barColor: "bg-green-400" },
               { label: t("parking.floor2"),     data: parkingData.floor2,       bg: "bg-blue-400",  textColor: "text-gray-900",  barColor: "bg-green-400" },
               { label: t("parking.floor3"),     data: parkingData.floor3,       bg: "bg-blue-400",  textColor: "text-gray-900",  barColor: "bg-green-400" },
