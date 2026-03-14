@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Header from '@/components/Header';
@@ -149,8 +149,8 @@ export default function ParkingRecordsPage() {
     return () => clearTimeout(timer);
   }, [searchTerm]);
 
-  // Reset to page 1 when search changes
-  useEffect(() => { setPage(1); }, [debouncedSearch]); // 0=non-member first, 1=regular first, 2=vip first
+  // Reset to page 1 when search or sort changes
+  useEffect(() => { setPage(1); }, [debouncedSearch, sortCol, sortDir, memberSortIdx]); // 0=non-member first, 1=regular first, 2=vip first
   const { t } = useLanguage();
   const router = useRouter();
 
@@ -177,6 +177,11 @@ export default function ParkingRecordsPage() {
         setLoading(true);
         const params = new URLSearchParams({ limit: String(LIMIT), page: String(page) });
         if (debouncedSearch.trim()) params.set('plate', debouncedSearch.trim());
+        if (sortCol) {
+          params.set('sortCol', sortCol);
+          params.set('sortDir', sortDir);
+          if (sortCol === 'member') params.set('memberIdx', String(memberSortIdx));
+        }
         const res  = await fetch(`/api/admin/parking?${params}`, { credentials: 'include', cache: 'no-store' });
         const body = await res.json();
         if (!res.ok || !body.success) throw new Error(body.error || 'Failed to fetch parking records');
@@ -190,7 +195,7 @@ export default function ParkingRecordsPage() {
         setLoading(false);
       }
     })();
-  }, [page, debouncedSearch]);
+  }, [page, debouncedSearch, sortCol, sortDir, memberSortIdx]);
 
   useEffect(() => {
     (async () => {
@@ -226,60 +231,8 @@ export default function ParkingRecordsPage() {
     }
   };
 
-  const memberOrder: Record<string, number> = { 'non-member': 0, 'regular': 1, 'vip': 2 };
-  const paymentOrder: Record<string, number> = { 'UNPAID': 0, 'PENDING': 1, 'PAID': 2 };
-
-  const sortedRecords = useMemo(() => {
-    if (!sortCol) return records;
-    return [...records].sort((a, b) => {
-      let cmp = 0;
-      switch (sortCol) {
-        case 'plate':
-          cmp = (b.detected_plate || '').localeCompare(a.detected_plate || '', 'th');
-          break;
-        case 'member': {
-          const ai = ((memberOrder[a.member_status] ?? 0) - memberSortIdx + 3) % 3;
-          const bi = ((memberOrder[b.member_status] ?? 0) - memberSortIdx + 3) % 3;
-          cmp = ai - bi;
-          break;
-        }
-        case 'parking':
-          cmp = (a.exit_time ? 1 : 0) - (b.exit_time ? 1 : 0);
-          break;
-        case 'payment':
-          cmp = (paymentOrder[a.payment_status] ?? 0) - (paymentOrder[b.payment_status] ?? 0);
-          break;
-        case 'entry':
-          cmp = new Date(a.entry_time).getTime() - new Date(b.entry_time).getTime();
-          break;
-        case 'exit': {
-          const aT = a.exit_time ? new Date(a.exit_time).getTime() : 0;
-          const bT = b.exit_time ? new Date(b.exit_time).getTime() : 0;
-          cmp = aT - bT;
-          break;
-        }
-        case 'duration': {
-          const dur = (r: ParkingRecord) => {
-            const s = new Date(r.entry_time).getTime();
-            const e = r.exit_time ? new Date(r.exit_time).getTime() : Date.now();
-            return e - s;
-          };
-          cmp = dur(a) - dur(b);
-          break;
-        }
-        case 'fee': {
-          const feeVal = (r: ParkingRecord) => rates
-            ? calculateFee(r.entry_time, r.exit_time, rates, r.member_status, r.extra_free_minutes || 0)
-            : (r.parking_fee ?? 0);
-          cmp = feeVal(a) - feeVal(b);
-          break;
-        }
-      }
-      if (sortCol === 'member') return cmp;
-      return sortDir === 'desc' ? -cmp : cmp;
-    });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [records, sortCol, sortDir, memberSortIdx, rates]);
+  // Sorting is server-side — records are already sorted by the API
+  const sortedRecords = records;
 
   const sortIcon = (col: SortCol) => {
     if (sortCol !== col) return <span className="text-gray-300 group-hover:text-gray-400">↕</span>;
