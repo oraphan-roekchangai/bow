@@ -18,6 +18,11 @@ const Line = nextDynamic(() => import("react-chartjs-2").then(m => ({ default: m
 const Bar  = nextDynamic(() => import("react-chartjs-2").then(m => ({ default: m.Bar })),  { ssr: false });
 const Pie  = nextDynamic(() => import("react-chartjs-2").then(m => ({ default: m.Pie })),  { ssr: false });
 
+ChartJS.register(
+  CategoryScale, LinearScale, PointElement, LineElement,
+  BarElement, ArcElement, Title, Tooltip, Legend, Filler
+);
+
 interface ParkingRecord {
   id: number;
   detected_plate: string;
@@ -51,17 +56,6 @@ export default function Dashboard() {
   };
 
   const pct = (used: number, total: number) => (used / total) * 100;
-  const [zoomReady, setZoomReady] = useState(false);
-
-  useEffect(() => {
-    import("chartjs-plugin-zoom").then((mod) => {
-      ChartJS.register(
-        CategoryScale, LinearScale, PointElement, LineElement,
-        BarElement, ArcElement, Title, Tooltip, Legend, Filler
-      );
-      setZoomReady(true);
-    });
-  }, []);
 
   // Load admin session
   useEffect(() => {
@@ -125,14 +119,6 @@ export default function Dashboard() {
     plugins: {
       legend: { display: false },
       tooltip: { intersect: false, mode: "index", backgroundColor: "#111827", titleColor: "#fff", bodyColor: "#e5e7eb", padding: 10 },
-      zoom: {
-        pan: { enabled: true, mode: "xy" },
-        zoom: {
-          wheel: { enabled: true },
-          pinch: { enabled: true },
-          mode: "xy",
-        },
-      },
     },
     scales: {
       x: { grid: { color: "#e5e7eb" }, ticks: { color: "#9ca3af", maxRotation: 0, autoSkip: true, maxTicksLimit: 12 } },
@@ -151,14 +137,6 @@ export default function Dashboard() {
     plugins: {
       legend: { display: false },
       tooltip: { intersect: false, mode: "index", backgroundColor: "#111827", titleColor: "#fff", bodyColor: "#e5e7eb", padding: 10 },
-      zoom: {
-        pan: { enabled: true, mode: "xy" },
-        zoom: {
-          wheel: { enabled: true },
-          pinch: { enabled: true },
-          mode: "xy",
-        },
-      },
     },
     scales: {
       x: { grid: { color: "#e5e7eb" }, ticks: { color: "#9ca3af", maxRotation: 0, autoSkip: true, maxTicksLimit: 12 } },
