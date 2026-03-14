@@ -13,21 +13,13 @@ interface ParkingRecord {
   entry_time: string;
   exit_time: string | null;
   parking_fee: number | null;
+  payment_status: 'UNPAID' | 'PENDING' | 'PAID';
+  member_status: 'vip' | 'regular' | 'non-member';
 }
 
 interface ParkingRates {
   rate_per_hour: number;
   minimum_fee: number;
-}
-
-interface Member {
-  plates: string[];
-  status: 'regular' | 'vip';
-}
-
-interface Member {
-  plates: string[]; // may have multiple plates
-  status: 'regular' | 'vip';
 }
 
 const navItems = [
@@ -57,7 +49,7 @@ const formatDuration = (entry: string, exit: string | null) => {
 // Mirror of server's fee.js
 function getFreeMinutes(memberStatus: string | null): number {
   if (memberStatus === 'vip' || memberStatus === 'regular') return 120;
-  return 60;
+  return 60; // non-member
 }
 
 function ceilDiv(a: number, b: number): number {
@@ -81,7 +73,6 @@ export default function ParkingRecordsPage() {
   const [adminName, setAdminName]     = useState('Admin');
   const [adminId, setAdminId]         = useState<number | null>(null);
   const [records, setRecords]         = useState<ParkingRecord[]>([]);
-  const [members, setMembers]         = useState<Member[]>([]);
   const [rates, setRates]             = useState<ParkingRates | null>(null);
   const [loading, setLoading]         = useState(true);
   const [error, setError]             = useState('');
@@ -129,41 +120,19 @@ export default function ParkingRecordsPage() {
   useEffect(() => {
     (async () => {
       try {
-        const res  = await fetch('/api/admin/users', { credentials: 'include', cache: 'no-store' });
-        const body = await res.json();
-        if (!res.ok || !body.success) return;
-        const parsed: Member[] = (body.data || [])
-          .filter((u: any) => u.plates?.length > 0)
-          .map((u: any) => ({
-            plates: u.plates,
-            status: u.status?.toLowerCase() === 'vip' ? 'vip' : 'regular',
-          }));
-        setMembers(parsed);
-      } catch { setMembers([]); }
-    })();
-  }, []);
-
-  useEffect(() => {
-    (async () => {
-      try {
         const res  = await fetch('/api/admin/parking-rates', { credentials: 'include', cache: 'no-store' });
         const body = await res.json();
         if (res.ok && body.success) setRates(body.data);
-      } catch { /* rates stay null, fee column shows DB value */ }
+      } catch { /* rates stay null */ }
     })();
   }, []);
-
-  const memberStatusByPlate = useMemo(() => {
-    const map = new Map<string, 'regular' | 'vip'>();
-    members.forEach((m) => m.plates.forEach((p) => map.set(p, m.status)));
-    return map;
-  }, [members]);
 
   const filteredRecords = useMemo(() => {
     const term = searchTerm.trim().toLowerCase();
     if (!term) return records;
     return records.filter((r) =>
-      [r.detected_plate, r.exit_time ? 'exited' : 'parked', r.entry_time, r.exit_time || '']
+      [r.detected_plate, r.exit_time ? 'exited' : 'parked', r.entry_time, r.exit_time || '',
+       r.payment_status, r.member_status]
         .join(' ').toLowerCase().includes(term)
     );
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -216,7 +185,7 @@ export default function ParkingRecordsPage() {
                 <table className="w-full border-collapse">
                   <thead className="sticky top-0 bg-gray-100 z-10">
                     <tr>
-                      {['License plate','Member Status','Status','Entry Time','Exit Time','Parking Duration','Total parking fee'].map((h) => (
+                      {['License plate','Member Status','Parking Status','Payment Status','Entry Time','Exit Time','Parking Duration','Total parking fee'].map((h) => (
                         <th key={h} className="px-6 py-4 text-left text-sm font-bold text-gray-800 border-r border-gray-300 last:border-r-0">{h}</th>
                       ))}
                     </tr>
@@ -224,28 +193,35 @@ export default function ParkingRecordsPage() {
                   <tbody>
                     {filteredRecords.length > 0 ? filteredRecords.map((record) => {
                       const isExited     = Boolean(record.exit_time);
-                      const plateKey     = (record.detected_plate || '').trim().toLowerCase();
-                      const memberStatus = memberStatusByPlate.get(plateKey) || null;
+                      const memberStatus = record.member_status || 'non-member';
 
-                      // Fee: use DB value if exited and paid, otherwise calculate live
+                      // Fee: use DB value if paid, otherwise calculate live
                       let displayFee: string;
-                      if (isExited && record.parking_fee != null) {
+                      if (record.parking_fee != null && record.payment_status === 'PAID') {
                         displayFee = `฿${Number(record.parking_fee).toFixed(2)}`;
                       } else if (rates) {
                         const liveFee = calculateFee(record.entry_time, record.exit_time, rates, memberStatus);
-                        displayFee = `฿${liveFee.toFixed(2)}${!isExited ? ' *' : ''}`;
+                        displayFee = `฿${liveFee.toFixed(2)}`;
                       } else {
                         displayFee = record.parking_fee != null ? `฿${Number(record.parking_fee).toFixed(2)}` : '-';
                       }
 
+                      // Member status label
                       let memberLabel: React.ReactNode;
                       if (memberStatus === 'vip') {
                         memberLabel = <span className="px-3 py-1 text-sm font-medium rounded text-red-800">{t('user.vip')}</span>;
                       } else if (memberStatus === 'regular') {
-                        memberLabel = <span className="px-3 py-1 text-sm font-medium rounded text-gray-800">{t('user.regular')}</span>;
+                        memberLabel = <span className="px-3 py-1 text-sm font-medium rounded text-blue-800">{t('user.regular')}</span>;
                       } else {
                         memberLabel = <span className="px-3 py-1 text-sm font-medium rounded text-gray-500">Non-member</span>;
                       }
+
+                      // Payment status label
+                      const paymentLabel = {
+                        PAID:    <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-700">Paid</span>,
+                        PENDING: <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-yellow-100 text-yellow-700">Pending</span>,
+                        UNPAID:  <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-red-100 text-red-700">Unpaid</span>,
+                      }[record.payment_status] ?? <span className="text-gray-400">-</span>;
 
                       return (
                         <tr key={record.id} className="border-b border-gray-200 hover:bg-gray-50">
@@ -256,6 +232,7 @@ export default function ParkingRecordsPage() {
                               {isExited ? 'Exited' : 'Parked'}
                             </span>
                           </td>
+                          <td className="px-6 py-4 text-sm text-gray-900 border-r border-gray-200">{paymentLabel}</td>
                           <td className="px-6 py-4 text-sm text-gray-900 border-r border-gray-200">{formatDateTime(record.entry_time)}</td>
                           <td className="px-6 py-4 text-sm text-gray-900 border-r border-gray-200">{formatDateTime(record.exit_time)}</td>
                           <td className="px-6 py-4 text-sm text-gray-900 border-r border-gray-200">{formatDuration(record.entry_time, record.exit_time)}</td>
@@ -263,7 +240,7 @@ export default function ParkingRecordsPage() {
                         </tr>
                       );
                     }) : (
-                      <tr><td colSpan={7} className="px-6 py-8 text-sm text-center text-gray-500">{t('table.noRecords')}</td></tr>
+                      <tr><td colSpan={8} className="px-6 py-8 text-sm text-center text-gray-500">{t('table.noRecords')}</td></tr>
                     )}
                   </tbody>
                 </table>
@@ -272,7 +249,7 @@ export default function ParkingRecordsPage() {
 
             {rates && (
               <div className="px-4 py-2 text-xs text-gray-400 border-t border-gray-100">
-                * Estimated fee, updates every minute — Rate: ฿{rates.rate_per_hour}/hr · Min fee: ฿{rates.minimum_fee} · Free: 60 min (120 min for members)
+                Estimated fee updates every minute — Rate: ฿{rates.rate_per_hour}/hr · Min fee: ฿{rates.minimum_fee} · Free: 60 min (120 min for members)
               </div>
             )}
           </div>
