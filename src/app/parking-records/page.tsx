@@ -15,6 +15,8 @@ interface ParkingRecord {
   parking_fee: number | null;
   payment_status: 'UNPAID' | 'PENDING' | 'PAID';
   member_status: 'vip' | 'regular' | 'non-member';
+  extra_free_minutes: number;
+  public_url: string | null;
 }
 
 interface ParkingRates {
@@ -56,12 +58,12 @@ function ceilDiv(a: number, b: number): number {
   return Math.floor((a + b - 1) / b);
 }
 
-function calculateFee(checkIn: string, checkOut: string | null, rates: ParkingRates, memberStatus: string | null): number {
+function calculateFee(checkIn: string, checkOut: string | null, rates: ParkingRates, memberStatus: string | null, extraFreeMinutes = 0): number {
   const start = new Date(checkIn).getTime();
   const end   = checkOut ? new Date(checkOut).getTime() : Date.now();
   if (isNaN(start) || isNaN(end) || end < start) return 0;
   const durationMinutes = Math.floor((end - start) / 60000);
-  const billableMinutes = Math.max(0, durationMinutes - getFreeMinutes(memberStatus));
+  const billableMinutes = Math.max(0, durationMinutes - getFreeMinutes(memberStatus) - extraFreeMinutes);
   if (billableMinutes === 0) return 0;
   const billableHours = ceilDiv(billableMinutes, 60);
   const fee = billableHours * Number(rates.rate_per_hour);
@@ -78,6 +80,8 @@ export default function ParkingRecordsPage() {
   const [error, setError]             = useState('');
   const [searchTerm, setSearchTerm]   = useState('');
   const [now, setNow]                 = useState(Date.now());
+  const [actionLoading, setActionLoading] = useState<{[key: string]: boolean}>({});
+  const [freeMinInput, setFreeMinInput]   = useState<{[id: number]: string}>({});
   const { t } = useLanguage();
   const router = useRouter();
 
@@ -138,6 +142,48 @@ export default function ParkingRecordsPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [records, searchTerm, now]);
 
+  const setLoading = (key: string, val: boolean) =>
+    setActionLoading(prev => ({ ...prev, [key]: val }));
+
+  const handleForceExit = async (id: number) => {
+    if (!confirm('Force this car to exit now?')) return;
+    setLoading(`exit-${id}`, true);
+    try {
+      const res  = await fetch('/api/admin/parking/force-exit', { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ id }) });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error || 'Failed');
+      setRecords(prev => prev.map(r => r.id === id ? { ...r, exit_time: new Date().toISOString() } : r));
+    } catch (err) { alert((err as Error).message); }
+    finally { setLoading(`exit-${id}`, false); }
+  };
+
+  const handleAddFreeMinutes = async (id: number) => {
+    const mins = parseInt(freeMinInput[id] || '');
+    if (isNaN(mins) || mins <= 0) { alert('Enter a valid number of minutes'); return; }
+    if (!confirm(`Add ${mins} free minutes to this record?`)) return;
+    setLoading(`free-${id}`, true);
+    try {
+      const res  = await fetch('/api/admin/parking/free-minutes', { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ id, minutes: mins }) });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error || 'Failed');
+      setRecords(prev => prev.map(r => r.id === id ? { ...r, extra_free_minutes: data.extra_free_minutes } : r));
+      setFreeMinInput(prev => ({ ...prev, [id]: '' }));
+    } catch (err) { alert((err as Error).message); }
+    finally { setLoading(`free-${id}`, false); }
+  };
+
+  const handleDelete = async (id: number) => {
+    if (!confirm('Permanently delete this parking record? This cannot be undone.')) return;
+    setLoading(`del-${id}`, true);
+    try {
+      const res  = await fetch('/api/admin/parking', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ id }) });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error || 'Failed');
+      setRecords(prev => prev.filter(r => r.id !== id));
+    } catch (err) { alert((err as Error).message); }
+    finally { setLoading(`del-${id}`, false); }
+  };
+
   return (
     <div className="h-screen bg-gray-50 overflow-hidden">
       {/* Sidebar */}
@@ -185,7 +231,7 @@ export default function ParkingRecordsPage() {
                 <table className="w-full border-collapse">
                   <thead className="sticky top-0 bg-gray-100 z-10">
                     <tr>
-                      {['License plate','Member Status','Parking Status','Payment Status','Entry Time','Exit Time','Parking Duration','Total parking fee'].map((h) => (
+                      {['License plate','Member Status','Parking Status','Payment Status','Entry Time','Exit Time','Parking Duration','Total parking fee','Actions'].map((h) => (
                         <th key={h} className="px-6 py-4 text-left text-sm font-bold text-gray-800 border-r border-gray-300 last:border-r-0">{h}</th>
                       ))}
                     </tr>
@@ -194,13 +240,14 @@ export default function ParkingRecordsPage() {
                     {filteredRecords.length > 0 ? filteredRecords.map((record) => {
                       const isExited     = Boolean(record.exit_time);
                       const memberStatus = record.member_status || 'non-member';
+                      const extraMins    = record.extra_free_minutes || 0;
 
                       // Fee: use DB value if paid, otherwise calculate live
                       let displayFee: string;
                       if (record.parking_fee != null && record.payment_status === 'PAID') {
                         displayFee = `฿${Number(record.parking_fee).toFixed(2)}`;
                       } else if (rates) {
-                        const liveFee = calculateFee(record.entry_time, record.exit_time, rates, memberStatus);
+                        const liveFee = calculateFee(record.entry_time, record.exit_time, rates, memberStatus, extraMins);
                         displayFee = `฿${liveFee.toFixed(2)}`;
                       } else {
                         displayFee = record.parking_fee != null ? `฿${Number(record.parking_fee).toFixed(2)}` : '-';
@@ -236,11 +283,54 @@ export default function ParkingRecordsPage() {
                           <td className="px-6 py-4 text-sm text-gray-900 border-r border-gray-200">{formatDateTime(record.entry_time)}</td>
                           <td className="px-6 py-4 text-sm text-gray-900 border-r border-gray-200">{formatDateTime(record.exit_time)}</td>
                           <td className="px-6 py-4 text-sm text-gray-900 border-r border-gray-200">{formatDuration(record.entry_time, record.exit_time)}</td>
-                          <td className="px-6 py-4 text-sm text-gray-900 font-medium">{displayFee}</td>
+                          <td className="px-6 py-4 text-sm text-gray-900 font-medium border-r border-gray-200">{displayFee}</td>
+                          <td className="px-4 py-3 text-sm text-gray-900">
+                            <div className="flex flex-col gap-2 min-w-[160px]">
+                              {/* Open parking page */}
+                              {record.public_url && (
+                                <a href={record.public_url} target="_blank" rel="noopener noreferrer"
+                                  className="inline-flex items-center justify-center gap-1 px-3 py-1.5 bg-blue-500 text-white text-xs font-medium rounded-lg hover:bg-blue-600 transition-colors">
+                                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
+                                  View Page
+                                </a>
+                              )}
+                              {/* Force exit — only for parked cars */}
+                              {!isExited && (
+                                <button onClick={() => handleForceExit(record.id)} disabled={!!actionLoading[`exit-${record.id}`]}
+                                  className="inline-flex items-center justify-center gap-1 px-3 py-1.5 bg-orange-500 text-white text-xs font-medium rounded-lg hover:bg-orange-600 transition-colors disabled:opacity-50">
+                                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
+                                  {actionLoading[`exit-${record.id}`] ? '...' : 'Force Exit'}
+                                </button>
+                              )}
+                              {/* Add free minutes — only for parked cars */}
+                              {!isExited && (
+                                <div className="flex gap-1">
+                                  <input type="number" min="1" placeholder="mins"
+                                    value={freeMinInput[record.id] || ''}
+                                    onChange={(e) => setFreeMinInput(prev => ({ ...prev, [record.id]: e.target.value }))}
+                                    className="w-16 px-2 py-1.5 border border-gray-300 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-green-500" />
+                                  <button onClick={() => handleAddFreeMinutes(record.id)} disabled={!!actionLoading[`free-${record.id}`]}
+                                    className="flex-1 inline-flex items-center justify-center gap-1 px-2 py-1.5 bg-green-500 text-white text-xs font-medium rounded-lg hover:bg-green-600 transition-colors disabled:opacity-50">
+                                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                    {actionLoading[`free-${record.id}`] ? '...' : '+Free'}
+                                  </button>
+                                </div>
+                              )}
+                              {extraMins > 0 && (
+                                <span className="text-xs text-green-600 font-medium">+{extraMins} free min</span>
+                              )}
+                              {/* Delete */}
+                              <button onClick={() => handleDelete(record.id)} disabled={!!actionLoading[`del-${record.id}`]}
+                                className="inline-flex items-center justify-center gap-1 px-3 py-1.5 bg-red-500 text-white text-xs font-medium rounded-lg hover:bg-red-600 transition-colors disabled:opacity-50">
+                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                {actionLoading[`del-${record.id}`] ? '...' : 'Delete'}
+                              </button>
+                            </div>
+                          </td>
                         </tr>
                       );
                     }) : (
-                      <tr><td colSpan={8} className="px-6 py-8 text-sm text-center text-gray-500">{t('table.noRecords')}</td></tr>
+                      <tr><td colSpan={9} className="px-6 py-8 text-sm text-center text-gray-500">{t('table.noRecords')}</td></tr>
                     )}
                   </tbody>
                 </table>
