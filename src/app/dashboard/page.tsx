@@ -13,13 +13,10 @@ import {
   BarElement, ArcElement, Title, Tooltip, Legend, Filler,
   ChartOptions, ChartData,
 } from "chart.js";
-import { Line, Bar, Pie } from "react-chartjs-2";
-import zoomPlugin from "chartjs-plugin-zoom";
-
-ChartJS.register(
-  CategoryScale, LinearScale, PointElement, LineElement,
-  BarElement, ArcElement, Title, Tooltip, Legend, Filler, zoomPlugin
-);
+import nextDynamic from "next/dynamic";
+const Line = nextDynamic(() => import("react-chartjs-2").then(m => ({ default: m.Line })), { ssr: false });
+const Bar  = nextDynamic(() => import("react-chartjs-2").then(m => ({ default: m.Bar })),  { ssr: false });
+const Pie  = nextDynamic(() => import("react-chartjs-2").then(m => ({ default: m.Pie })),  { ssr: false });
 
 interface ParkingRecord {
   id: number;
@@ -54,6 +51,12 @@ export default function Dashboard() {
   };
 
   const pct = (used: number, total: number) => (used / total) * 100;
+
+  useEffect(() => {
+    import("chartjs-plugin-zoom").then((mod) => {
+      ChartJS.register(mod.default);
+    });
+  }, []);
 
   // Load admin session
   useEffect(() => {
