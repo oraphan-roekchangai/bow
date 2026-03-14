@@ -30,7 +30,7 @@ function ConfirmModal({ message, warning, confirmLabel = 'OK', confirmClassName,
         {/* Header */}
         <div className="px-8 pt-7 pb-2 flex items-center justify-between">
           <h2 className="text-gray-900 font-bold text-lg">Dashboard</h2>
-          <img src="/admin/prologic-logo.png" alt="ProLogic" className="h-8 object-contain" />
+          <img src="/admin/prologic-logo.png" alt="ProLogic" className="h-8 object-contain mt-[3px]" />
         </div>
         {/* Divider with 5px gap from each side */}
         <div className="mx-[15px] border-t border-gray-200" />
@@ -307,7 +307,7 @@ export default function ParkingRecordsPage() {
           const data = await res.json();
           if (!res.ok || !data.success) throw new Error(data.error || 'Failed');
           setRecords(prev => prev.map(r => r.id === id ? { ...r, exit_time: new Date().toISOString() } : r));
-        } catch (err) { alert((err as Error).message); }
+        } catch (err) { setModal({ message: (err as Error).message || 'Failed to force exit', confirmLabel: 'OK', hideCancel: true, confirmClassName: 'px-7 py-2.5 rounded-lg text-sm font-medium bg-red-600 text-white hover:bg-red-700 transition-colors', onConfirm: () => setModal(null) }); }
         finally { setActionState(`exit-${id}`, false); }
       },
     });
@@ -338,7 +338,7 @@ export default function ParkingRecordsPage() {
           if (!res.ok || !data.success) throw new Error(data.error || 'Failed');
           setRecords(prev => prev.map(r => r.id === id ? { ...r, extra_free_minutes: data.extra_free_minutes } : r));
           setFreeMinInput(prev => ({ ...prev, [id]: '' }));
-        } catch (err) { alert((err as Error).message); }
+        } catch (err) { setModal({ message: (err as Error).message || 'Failed to add free minutes', confirmLabel: 'OK', hideCancel: true, confirmClassName: 'px-7 py-2.5 rounded-lg text-sm font-medium bg-red-600 text-white hover:bg-red-700 transition-colors', onConfirm: () => setModal(null) }); }
         finally { setActionState(`free-${id}`, false); }
       },
     });
@@ -358,7 +358,7 @@ export default function ParkingRecordsPage() {
           const data = await res.json();
           if (!res.ok || !data.success) throw new Error(data.error || 'Failed');
           setRecords(prev => prev.filter(r => r.id !== id));
-        } catch (err) { alert((err as Error).message); }
+        } catch (err) { setModal({ message: (err as Error).message || 'Failed to delete record', confirmLabel: 'OK', hideCancel: true, confirmClassName: 'px-7 py-2.5 rounded-lg text-sm font-medium bg-red-600 text-white hover:bg-red-700 transition-colors', onConfirm: () => setModal(null) }); }
         finally { setActionState(`del-${id}`, false); }
       },
     });

@@ -1,11 +1,46 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Header from '@/components/Header';
 import MaterialIcon from '@/components/MaterialIcon';
 import { useLanguage } from '@/contexts/LanguageContext';
+
+// ── Confirmation Modal ────────────────────────────────────────────────────────
+interface ModalState {
+  message: string;
+  warning?: string;
+  confirmLabel?: string;
+  confirmClassName?: string;
+  hideCancel?: boolean;
+  onConfirm: () => void;
+}
+
+function ConfirmModal({ message, warning, confirmLabel = 'OK', confirmClassName, hideCancel, onConfirm, onCancel }: ModalState & { onCancel: () => void }) {
+  const cancelRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => { cancelRef.current?.focus(); }, []);
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onCancel} />
+      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 overflow-hidden">
+        <div className="px-8 pt-7 pb-2 flex items-center justify-between">
+          <h2 className="text-gray-900 font-bold text-lg">Dashboard</h2>
+          <img src="/admin/prologic-logo.png" alt="ProLogic" className="h-8 object-contain" />
+        </div>
+        <div className="mx-[15px] border-t border-gray-200" />
+        <div className="px-8 pt-4 pb-7 space-y-2">
+          <p className="text-gray-700 text-base leading-relaxed">{message}</p>
+          {warning && <p className="text-red-600 text-base font-semibold">{warning}</p>}
+        </div>
+        <div className="px-8 pb-7 flex justify-end gap-3">
+          {!hideCancel && <button ref={cancelRef} onClick={onCancel} className="px-7 py-2.5 rounded-lg text-sm font-medium border border-gray-300 text-gray-700 hover:bg-gray-50 transition-colors">Cancel</button>}
+          <button onClick={onConfirm} className={confirmClassName || 'px-7 py-2.5 rounded-lg text-sm font-medium bg-green-600 text-white hover:bg-green-700 transition-colors'}>{confirmLabel}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 interface Admin {
   id: number;
@@ -37,8 +72,12 @@ export default function AdminManagement() {
   const [editForm, setEditForm]       = useState({ fullName: '', username: '', email: '', phoneNumber: '', password: '' });
   const [saving, setSaving]           = useState(false);
   const [deletingId, setDeletingId]   = useState<number | null>(null);
+  const [modal, setModal]             = useState<ModalState | null>(null);
   const { t } = useLanguage();
   const router = useRouter();
+
+  const showModal = (m: ModalState) => setModal(m);
+  const closeModal = () => setModal(null);
 
   useEffect(() => {
     (async () => {
@@ -86,40 +125,55 @@ export default function AdminManagement() {
   const saveAdmin = async () => {
     if (editingId === null) return;
     if (!editForm.fullName.trim() || !editForm.username.trim() || !editForm.email.trim() || !editForm.phoneNumber.trim()) {
-      alert(t('admin.error') || 'Please fill in all required fields');
+      showModal({ message: t('admin.error') || 'Please fill in all required fields', confirmLabel: 'OK', hideCancel: true, confirmClassName: 'px-7 py-2.5 rounded-lg text-sm font-medium bg-emerald-600 text-white hover:bg-emerald-700 transition-colors', onConfirm: closeModal });
       return;
     }
-    if (!confirm(t('admin.saveConfirm') || 'Save changes?')) return;
-    setSaving(true);
-    const payload: Record<string, string | number> = { id: editingId, fullName: editForm.fullName.trim(), username: editForm.username.trim(), email: editForm.email.trim(), phoneNumber: editForm.phoneNumber.trim() };
-    if (editForm.password.trim()) payload.password = editForm.password.trim();
-    try {
-      const res = await fetch('/api/admin/admins', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-      const data = await res.json();
-      if (!res.ok || !data.success) throw new Error(data.error || 'Failed to update admin');
-      setAdmins((prev) => prev.map((a) => (a.id === editingId ? data.admin : a)));
-      cancelEditing();
-    } catch (err) {
-      alert((err as Error).message || 'Failed to update admin');
-    } finally {
-      setSaving(false);
-    }
+    showModal({
+      message: t('admin.saveConfirm') || 'Save changes?',
+      confirmLabel: 'Save',
+      confirmClassName: 'px-7 py-2.5 rounded-lg text-sm font-medium bg-emerald-600 text-white hover:bg-emerald-700 transition-colors',
+      onConfirm: async () => {
+        closeModal();
+        setSaving(true);
+        const payload: Record<string, string | number> = { id: editingId!, fullName: editForm.fullName.trim(), username: editForm.username.trim(), email: editForm.email.trim(), phoneNumber: editForm.phoneNumber.trim() };
+        if (editForm.password.trim()) payload.password = editForm.password.trim();
+        try {
+          const res = await fetch('/api/admin/admins', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+          const data = await res.json();
+          if (!res.ok || !data.success) throw new Error(data.error || 'Failed to update admin');
+          setAdmins((prev) => prev.map((a) => (a.id === editingId ? data.admin : a)));
+          cancelEditing();
+        } catch (err) {
+          showModal({ message: (err as Error).message || 'Failed to update admin', confirmLabel: 'OK', hideCancel: true, confirmClassName: 'px-7 py-2.5 rounded-lg text-sm font-medium bg-red-600 text-white hover:bg-red-700 transition-colors', onConfirm: closeModal });
+        } finally {
+          setSaving(false);
+        }
+      },
+    });
   };
 
   const handleDelete = async (id: number) => {
-    if (!confirm(t('admin.deleteConfirm') || 'Delete this admin?')) return;
-    setDeletingId(id);
-    try {
-      const res = await fetch('/api/admin/admins', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) });
-      const data = await res.json();
-      if (!res.ok || !data.success) throw new Error(data.error || 'Failed to delete');
-      setAdmins((prev) => prev.filter((a) => a.id !== id));
-      if (editingId === id) cancelEditing();
-    } catch (err) {
-      alert((err as Error).message || 'Failed to delete admin');
-    } finally {
-      setDeletingId(null);
-    }
+    showModal({
+      message: t('admin.deleteConfirm') || 'Delete this admin?',
+      warning: '*** This cannot be undone. ***',
+      confirmLabel: 'Delete',
+      confirmClassName: 'px-7 py-2.5 rounded-lg text-sm font-medium bg-red-600 text-white hover:bg-red-700 transition-colors',
+      onConfirm: async () => {
+        closeModal();
+        setDeletingId(id);
+        try {
+          const res = await fetch('/api/admin/admins', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) });
+          const data = await res.json();
+          if (!res.ok || !data.success) throw new Error(data.error || 'Failed to delete');
+          setAdmins((prev) => prev.filter((a) => a.id !== id));
+          if (editingId === id) cancelEditing();
+        } catch (err) {
+          showModal({ message: (err as Error).message || 'Failed to delete admin', confirmLabel: 'OK', hideCancel: true, confirmClassName: 'px-7 py-2.5 rounded-lg text-sm font-medium bg-red-600 text-white hover:bg-red-700 transition-colors', onConfirm: closeModal });
+        } finally {
+          setDeletingId(null);
+        }
+      },
+    });
   };
 
   return (
@@ -247,6 +301,8 @@ export default function AdminManagement() {
           </div>
         </div>
       </div>
+
+      {modal && <ConfirmModal {...modal} onCancel={closeModal} />}
     </div>
   );
 }
