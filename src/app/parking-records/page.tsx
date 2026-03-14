@@ -217,7 +217,7 @@ export default function ParkingRecordsPage() {
                 <div className="relative w-full max-w-lg">
                   <span className="absolute inset-y-0 left-3 flex items-center"><MaterialIcon name="search" size="small" className="text-gray-400" /></span>
                   <input type="text" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder={t('common.search') || 'Search'}
-                    className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-xl text-sm bg-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-green-500" />
+                    className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-xl text-sm text-gray-900 caret-gray-900 bg-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-green-500" />
                 </div>
               </div>
             </div>
@@ -241,6 +241,9 @@ export default function ParkingRecordsPage() {
                       const isExited     = Boolean(record.exit_time);
                       const memberStatus = record.member_status || 'non-member';
                       const extraMins    = record.extra_free_minutes || 0;
+                      const isExitLoading = !!actionLoading[`exit-${record.id}`];
+                      const isFreeLoading = !!actionLoading[`free-${record.id}`];
+                      const isDeleteLoading = !!actionLoading[`del-${record.id}`];
 
                       // Fee: use DB value if paid, otherwise calculate live
                       let displayFee: string;
@@ -285,45 +288,49 @@ export default function ParkingRecordsPage() {
                           <td className="px-6 py-4 text-sm text-gray-900 border-r border-gray-200">{formatDuration(record.entry_time, record.exit_time)}</td>
                           <td className="px-6 py-4 text-sm text-gray-900 font-medium border-r border-gray-200">{displayFee}</td>
                           <td className="px-4 py-3 text-sm text-gray-900">
-                            <div className="flex flex-col gap-2 min-w-[160px]">
-                              {/* Open parking page — only for parked cars */}
-                              {!isExited && record.public_url && (
-                                <a href={record.public_url} target="_blank" rel="noopener noreferrer"
-                                  className="inline-flex items-center justify-center gap-1 px-3 py-1.5 bg-blue-500 text-white text-xs font-medium rounded-lg hover:bg-blue-600 transition-colors">
-                                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
-                                  View Page
-                                </a>
-                              )}
-                              {/* Force exit — only for parked cars */}
+                            <div className="min-w-[220px] space-y-2.5">
                               {!isExited && (
-                                <button onClick={() => handleForceExit(record.id)} disabled={!!actionLoading[`exit-${record.id}`]}
-                                  className="inline-flex items-center justify-center gap-1 px-3 py-1.5 bg-orange-500 text-white text-xs font-medium rounded-lg hover:bg-orange-600 transition-colors disabled:opacity-50">
-                                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
-                                  {actionLoading[`exit-${record.id}`] ? '...' : 'Force Exit'}
-                                </button>
-                              )}
-                              {/* Add free minutes — only for parked cars */}
-                              {!isExited && (
-                                <div className="flex gap-1">
-                                  <input type="number" min="1" placeholder="mins"
-                                    value={freeMinInput[record.id] || ''}
-                                    onChange={(e) => setFreeMinInput(prev => ({ ...prev, [record.id]: e.target.value }))}
-                                    className="w-16 px-2 py-1.5 border border-gray-300 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-green-500" />
-                                  <button onClick={() => handleAddFreeMinutes(record.id)} disabled={!!actionLoading[`free-${record.id}`]}
-                                    className="flex-1 inline-flex items-center justify-center gap-1 px-2 py-1.5 bg-green-500 text-white text-xs font-medium rounded-lg hover:bg-green-600 transition-colors disabled:opacity-50">
-                                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                                    {actionLoading[`free-${record.id}`] ? '...' : '+Free'}
+                                <div className="grid grid-cols-2 gap-2">
+                                  {record.public_url && (
+                                    <a href={record.public_url} target="_blank" rel="noopener noreferrer"
+                                      className="inline-flex items-center justify-center gap-1.5 px-3 py-2 border border-sky-200 bg-sky-50 text-sky-700 text-xs font-semibold rounded-lg hover:bg-sky-100 transition-colors">
+                                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
+                                      View Page
+                                    </a>
+                                  )}
+                                  <button onClick={() => handleForceExit(record.id)} disabled={isExitLoading}
+                                    className={`inline-flex items-center justify-center gap-1.5 px-3 py-2 bg-orange-500 text-white text-xs font-semibold rounded-lg hover:bg-orange-600 transition-colors disabled:opacity-50 ${record.public_url ? '' : 'col-span-2'}`}>
+                                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
+                                    {isExitLoading ? 'Processing...' : 'Force Exit'}
                                   </button>
                                 </div>
                               )}
-                              {extraMins > 0 && (
-                                <span className="text-xs text-green-600 font-medium">+{extraMins} free min</span>
+
+                              {!isExited && (
+                                <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 p-2">
+                                  <p className="text-[11px] font-semibold text-emerald-700 mb-1">Add free minutes</p>
+                                  <div className="flex items-center gap-2">
+                                    <input type="number" min="1" placeholder="mins"
+                                      value={freeMinInput[record.id] || ''}
+                                      onChange={(e) => setFreeMinInput(prev => ({ ...prev, [record.id]: e.target.value }))}
+                                      className="w-20 px-2 py-1.5 border border-emerald-300 bg-white rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-emerald-500" />
+                                    <button onClick={() => handleAddFreeMinutes(record.id)} disabled={isFreeLoading}
+                                      className="flex-1 inline-flex items-center justify-center gap-1.5 px-2 py-1.5 bg-emerald-600 text-white text-xs font-semibold rounded-lg hover:bg-emerald-700 transition-colors disabled:opacity-50">
+                                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                      {isFreeLoading ? 'Adding...' : 'Apply'}
+                                    </button>
+                                  </div>
+                                </div>
                               )}
-                              {/* Delete */}
-                              <button onClick={() => handleDelete(record.id)} disabled={!!actionLoading[`del-${record.id}`]}
-                                className="inline-flex items-center justify-center gap-1 px-3 py-1.5 bg-red-500 text-white text-xs font-medium rounded-lg hover:bg-red-600 transition-colors disabled:opacity-50">
+
+                              {extraMins > 0 && (
+                                <span className="inline-flex items-center px-2 py-1 rounded-full text-[11px] font-semibold bg-emerald-100 text-emerald-700">+{extraMins} free min</span>
+                              )}
+
+                              <button onClick={() => handleDelete(record.id)} disabled={isDeleteLoading}
+                                className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 border border-red-200 bg-red-50 text-red-700 text-xs font-semibold rounded-lg hover:bg-red-100 transition-colors disabled:opacity-50">
                                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                                {actionLoading[`del-${record.id}`] ? '...' : 'Delete'}
+                                {isDeleteLoading ? 'Deleting...' : 'Delete Record'}
                               </button>
                             </div>
                           </td>
