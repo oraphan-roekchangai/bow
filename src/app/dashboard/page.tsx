@@ -51,6 +51,7 @@ export default function Dashboard() {
   };
 
   const pct = (used: number, total: number) => (used / total) * 100;
+  const [zoomReady, setZoomReady] = useState(false);
 
   useEffect(() => {
     import("chartjs-plugin-zoom").then((mod) => {
@@ -58,6 +59,7 @@ export default function Dashboard() {
         CategoryScale, LinearScale, PointElement, LineElement,
         BarElement, ArcElement, Title, Tooltip, Legend, Filler
       );
+      setZoomReady(true);
     });
   }, []);
 
@@ -124,11 +126,11 @@ export default function Dashboard() {
       legend: { display: false },
       tooltip: { intersect: false, mode: "index", backgroundColor: "#111827", titleColor: "#fff", bodyColor: "#e5e7eb", padding: 10 },
       zoom: {
-        pan: { enabled: true, mode: "x" },
+        pan: { enabled: true, mode: "xy" },
         zoom: {
           wheel: { enabled: true },
           pinch: { enabled: true },
-          mode: "x",
+          mode: "xy",
         },
       },
     },
@@ -150,11 +152,11 @@ export default function Dashboard() {
       legend: { display: false },
       tooltip: { intersect: false, mode: "index", backgroundColor: "#111827", titleColor: "#fff", bodyColor: "#e5e7eb", padding: 10 },
       zoom: {
-        pan: { enabled: true, mode: "x" },
+        pan: { enabled: true, mode: "xy" },
         zoom: {
           wheel: { enabled: true },
           pinch: { enabled: true },
-          mode: "x",
+          mode: "xy",
         },
       },
     },
