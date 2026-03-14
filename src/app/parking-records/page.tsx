@@ -319,7 +319,7 @@ export default function ParkingRecordsPage() {
       setModal({
         message: 'Enter a valid number of minutes.',
         confirmLabel: 'OK',
-        confirmClassName: 'px-7 py-2.5 rounded-lg text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 transition-colors',
+        confirmClassName: 'px-7 py-2.5 rounded-lg text-sm font-medium bg-emerald-600 text-white hover:bg-emerald-700 transition-colors',
         hideCancel: true,
         onConfirm: () => setModal(null),
       });
