@@ -48,10 +48,9 @@ const formatDuration = (entry: string, exit: string | null) => {
   return h === 0 ? `${m}m` : `${h}h ${m}m`;
 };
 
-// Mirror of server's fee.js
 function getFreeMinutes(memberStatus: string | null): number {
   if (memberStatus === 'vip' || memberStatus === 'regular') return 120;
-  return 60; // non-member
+  return 60;
 }
 
 function ceilDiv(a: number, b: number): number {
@@ -70,6 +69,9 @@ function calculateFee(checkIn: string, checkOut: string | null, rates: ParkingRa
   return Number(Math.max(fee, Number(rates.minimum_fee)).toFixed(2));
 }
 
+type SortCol = 'plate' | 'member' | 'parking' | 'payment' | 'entry' | 'exit' | 'duration' | 'fee';
+type SortDir = 'asc' | 'desc';
+
 export default function ParkingRecordsPage() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [adminName, setAdminName]     = useState('Admin');
@@ -82,10 +84,12 @@ export default function ParkingRecordsPage() {
   const [now, setNow]                 = useState(Date.now());
   const [actionLoading, setActionLoading] = useState<{[key: string]: boolean}>({});
   const [freeMinInput, setFreeMinInput]   = useState<{[id: number]: string}>({});
+  const [sortCol, setSortCol]             = useState<SortCol | null>(null);
+  const [sortDir, setSortDir]             = useState<SortDir>('desc');
+  const [memberSortIdx, setMemberSortIdx] = useState(0); // 0=non-member first, 1=regular first, 2=vip first
   const { t } = useLanguage();
   const router = useRouter();
 
-  // Tick every 60s to update live fees for parked cars
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 60000);
     return () => clearInterval(timer);
@@ -142,6 +146,85 @@ export default function ParkingRecordsPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [records, searchTerm, now]);
 
+  const handleSort = (col: SortCol) => {
+    if (col === 'member') {
+      setSortCol('member');
+      setMemberSortIdx(prev => (prev + 1) % 3);
+      return;
+    }
+    if (sortCol === col) {
+      setSortDir(prev => prev === 'desc' ? 'asc' : 'desc');
+    } else {
+      setSortCol(col);
+      setSortDir('desc');
+    }
+  };
+
+  const memberOrder: Record<string, number> = { 'non-member': 0, 'regular': 1, 'vip': 2 };
+  const paymentOrder: Record<string, number> = { 'UNPAID': 0, 'PENDING': 1, 'PAID': 2 };
+
+  const sortedRecords = useMemo(() => {
+    if (!sortCol) return filteredRecords;
+    return [...filteredRecords].sort((a, b) => {
+      let cmp = 0;
+      switch (sortCol) {
+        case 'plate':
+          cmp = (a.detected_plate || '').localeCompare(b.detected_plate || '');
+          break;
+        case 'member': {
+          const ai = ((memberOrder[a.member_status] ?? 0) - memberSortIdx + 3) % 3;
+          const bi = ((memberOrder[b.member_status] ?? 0) - memberSortIdx + 3) % 3;
+          cmp = ai - bi;
+          break;
+        }
+        case 'parking':
+          cmp = (a.exit_time ? 1 : 0) - (b.exit_time ? 1 : 0);
+          break;
+        case 'payment':
+          cmp = (paymentOrder[a.payment_status] ?? 0) - (paymentOrder[b.payment_status] ?? 0);
+          break;
+        case 'entry':
+          cmp = new Date(a.entry_time).getTime() - new Date(b.entry_time).getTime();
+          break;
+        case 'exit': {
+          const aT = a.exit_time ? new Date(a.exit_time).getTime() : 0;
+          const bT = b.exit_time ? new Date(b.exit_time).getTime() : 0;
+          cmp = aT - bT;
+          break;
+        }
+        case 'duration': {
+          const dur = (r: ParkingRecord) => {
+            const s = new Date(r.entry_time).getTime();
+            const e = r.exit_time ? new Date(r.exit_time).getTime() : Date.now();
+            return e - s;
+          };
+          cmp = dur(a) - dur(b);
+          break;
+        }
+        case 'fee': {
+          const feeVal = (r: ParkingRecord) => rates
+            ? calculateFee(r.entry_time, r.exit_time, rates, r.member_status, r.extra_free_minutes || 0)
+            : (r.parking_fee ?? 0);
+          cmp = feeVal(a) - feeVal(b);
+          break;
+        }
+      }
+      if (sortCol === 'member') return cmp;
+      return sortDir === 'desc' ? -cmp : cmp;
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filteredRecords, sortCol, sortDir, memberSortIdx, rates]);
+
+  // Sort indicator helper
+  const sortIcon = (col: SortCol) => {
+    if (sortCol !== col) return <span className="text-gray-300 group-hover:text-gray-400">↕</span>;
+    if (col === 'member') {
+      const labels = ['N→R→V', 'R→V→N', 'V→N→R'];
+      return <span className="text-green-600 text-[10px]">{labels[memberSortIdx]}</span>;
+    }
+    return <span className="text-green-600">{sortDir === 'desc' ? '↓' : '↑'}</span>;
+  };
+
   const setActionState = (key: string, val: boolean) =>
     setActionLoading(prev => ({ ...prev, [key]: val }));
 
@@ -183,6 +266,18 @@ export default function ParkingRecordsPage() {
     } catch (err) { alert((err as Error).message); }
     finally { setActionState(`del-${id}`, false); }
   };
+
+  const columns: { label: string; col: SortCol | null }[] = [
+    { label: 'License plate',    col: 'plate'    },
+    { label: 'Member Status',    col: 'member'   },
+    { label: 'Parking Status',   col: 'parking'  },
+    { label: 'Payment Status',   col: 'payment'  },
+    { label: 'Entry Time',       col: 'entry'    },
+    { label: 'Exit Time',        col: 'exit'     },
+    { label: 'Parking Duration', col: 'duration' },
+    { label: 'Total parking fee',col: 'fee'      },
+    { label: 'Actions',          col: null       },
+  ];
 
   return (
     <div className="h-screen bg-gray-50 overflow-hidden">
@@ -231,21 +326,27 @@ export default function ParkingRecordsPage() {
                 <table className="w-full border-collapse">
                   <thead className="sticky top-0 bg-gray-100 z-10">
                     <tr>
-                      {['License plate','Member Status','Parking Status','Payment Status','Entry Time','Exit Time','Parking Duration','Total parking fee','Actions'].map((h) => (
-                        <th key={h} className="px-6 py-4 text-left text-sm font-bold text-gray-800 border-r border-gray-300 last:border-r-0">{h}</th>
+                      {columns.map(({ label, col }) => (
+                        <th key={label} className="px-6 py-4 text-left text-sm font-bold text-gray-800 border-r border-gray-300 last:border-r-0">
+                          {col ? (
+                            <button onClick={() => handleSort(col)} className="flex items-center gap-1 hover:text-green-600 transition-colors group whitespace-nowrap">
+                              {label}
+                              <span className="text-xs">{sortIcon(col)}</span>
+                            </button>
+                          ) : label}
+                        </th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredRecords.length > 0 ? filteredRecords.map((record) => {
-                      const isExited     = Boolean(record.exit_time);
-                      const memberStatus = record.member_status || 'non-member';
-                      const extraMins    = record.extra_free_minutes || 0;
-                      const isExitLoading = !!actionLoading[`exit-${record.id}`];
-                      const isFreeLoading = !!actionLoading[`free-${record.id}`];
+                    {sortedRecords.length > 0 ? sortedRecords.map((record) => {
+                      const isExited        = Boolean(record.exit_time);
+                      const memberStatus    = record.member_status || 'non-member';
+                      const extraMins       = record.extra_free_minutes || 0;
+                      const isExitLoading   = !!actionLoading[`exit-${record.id}`];
+                      const isFreeLoading   = !!actionLoading[`free-${record.id}`];
                       const isDeleteLoading = !!actionLoading[`del-${record.id}`];
 
-                      // Fee: use DB value if paid, otherwise calculate live
                       let displayFee: string;
                       if (record.parking_fee != null && record.payment_status === 'PAID') {
                         displayFee = `฿${Number(record.parking_fee).toFixed(2)}`;
@@ -256,7 +357,6 @@ export default function ParkingRecordsPage() {
                         displayFee = record.parking_fee != null ? `฿${Number(record.parking_fee).toFixed(2)}` : '-';
                       }
 
-                      // Member status label
                       let memberLabel: React.ReactNode;
                       if (memberStatus === 'vip') {
                         memberLabel = <span className="px-3 py-1 text-sm font-medium rounded text-red-800">{t('user.vip')}</span>;
@@ -266,7 +366,6 @@ export default function ParkingRecordsPage() {
                         memberLabel = <span className="px-3 py-1 text-sm font-medium rounded text-gray-500">Non-member</span>;
                       }
 
-                      // Payment status label
                       const paymentLabel = {
                         PAID:    <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-700">Paid</span>,
                         PENDING: <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-yellow-100 text-yellow-700">Pending</span>,
