@@ -15,14 +15,19 @@ interface ParkingRecord {
   parking_fee: number | null;
 }
 
-interface Member {
-  licensePlate: string;
-  status: 'regular' | 'vip';
-}
-
 interface ParkingRates {
   rate_per_hour: number;
   minimum_fee: number;
+}
+
+interface Member {
+  plates: string[];
+  status: 'regular' | 'vip';
+}
+
+interface Member {
+  plates: string[]; // may have multiple plates
+  status: 'regular' | 'vip';
 }
 
 const navItems = [
@@ -59,18 +64,12 @@ function ceilDiv(a: number, b: number): number {
   return Math.floor((a + b - 1) / b);
 }
 
-function calculateFee(
-  checkIn: string,
-  checkOut: string | null,
-  memberStatus: string | null,
-  rates: ParkingRates
-): number {
+function calculateFee(checkIn: string, checkOut: string | null, rates: ParkingRates, memberStatus: string | null): number {
   const start = new Date(checkIn).getTime();
   const end   = checkOut ? new Date(checkOut).getTime() : Date.now();
   if (isNaN(start) || isNaN(end) || end < start) return 0;
   const durationMinutes = Math.floor((end - start) / 60000);
-  const freeMinutes     = getFreeMinutes(memberStatus);
-  const billableMinutes = Math.max(0, durationMinutes - freeMinutes);
+  const billableMinutes = Math.max(0, durationMinutes - getFreeMinutes(memberStatus));
   if (billableMinutes === 0) return 0;
   const billableHours = ceilDiv(billableMinutes, 60);
   const fee = billableHours * Number(rates.rate_per_hour);
@@ -133,11 +132,13 @@ export default function ParkingRecordsPage() {
         const res  = await fetch('/api/admin/users', { credentials: 'include', cache: 'no-store' });
         const body = await res.json();
         if (!res.ok || !body.success) return;
-        const parsed: Member[] = (body.data || []).map((u: any) => ({
-          licensePlate: (u.license_plate || '').trim().toLowerCase(),
-          status: u.status?.toLowerCase() === 'vip' ? 'vip' : 'regular',
-        }));
-        setMembers(parsed.filter((m) => m.licensePlate));
+        const parsed: Member[] = (body.data || [])
+          .filter((u: any) => u.plates?.length > 0)
+          .map((u: any) => ({
+            plates: u.plates,
+            status: u.status?.toLowerCase() === 'vip' ? 'vip' : 'regular',
+          }));
+        setMembers(parsed);
       } catch { setMembers([]); }
     })();
   }, []);
@@ -148,13 +149,13 @@ export default function ParkingRecordsPage() {
         const res  = await fetch('/api/admin/parking-rates', { credentials: 'include', cache: 'no-store' });
         const body = await res.json();
         if (res.ok && body.success) setRates(body.data);
-      } catch { /* fall back to DB fee value */ }
+      } catch { /* rates stay null, fee column shows DB value */ }
     })();
   }, []);
 
   const memberStatusByPlate = useMemo(() => {
     const map = new Map<string, 'regular' | 'vip'>();
-    members.forEach((m) => map.set(m.licensePlate, m.status));
+    members.forEach((m) => m.plates.forEach((p) => map.set(p, m.status)));
     return map;
   }, [members]);
 
@@ -165,7 +166,6 @@ export default function ParkingRecordsPage() {
       [r.detected_plate, r.exit_time ? 'exited' : 'parked', r.entry_time, r.exit_time || '']
         .join(' ').toLowerCase().includes(term)
     );
-  // now in deps so live fee rows re-render every minute
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [records, searchTerm, now]);
 
@@ -227,20 +227,17 @@ export default function ParkingRecordsPage() {
                       const plateKey     = (record.detected_plate || '').trim().toLowerCase();
                       const memberStatus = memberStatusByPlate.get(plateKey) || null;
 
-                      // Fee display logic:
-                      // - Exited + fee in DB → show settled amount
-                      // - Otherwise → calculate live from formula
+                      // Fee: use DB value if exited and paid, otherwise calculate live
                       let displayFee: string;
                       if (isExited && record.parking_fee != null) {
                         displayFee = `฿${Number(record.parking_fee).toFixed(2)}`;
                       } else if (rates) {
-                        const liveFee = calculateFee(record.entry_time, record.exit_time, memberStatus, rates);
+                        const liveFee = calculateFee(record.entry_time, record.exit_time, rates, memberStatus);
                         displayFee = `฿${liveFee.toFixed(2)}${!isExited ? ' *' : ''}`;
                       } else {
                         displayFee = record.parking_fee != null ? `฿${Number(record.parking_fee).toFixed(2)}` : '-';
                       }
 
-                      // Member status label
                       let memberLabel: React.ReactNode;
                       if (memberStatus === 'vip') {
                         memberLabel = <span className="px-3 py-1 text-sm font-medium rounded text-red-800">{t('user.vip')}</span>;
@@ -273,7 +270,6 @@ export default function ParkingRecordsPage() {
               )}
             </div>
 
-            {/* Footer note */}
             {rates && (
               <div className="px-4 py-2 text-xs text-gray-400 border-t border-gray-100">
                 * Estimated fee, updates every minute — Rate: ฿{rates.rate_per_hour}/hr · Min fee: ฿{rates.minimum_fee} · Free: 60 min (120 min for members)
