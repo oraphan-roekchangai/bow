@@ -127,6 +127,7 @@ export default function ParkingRecordsPage() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [adminName, setAdminName]     = useState('Admin');
   const [adminId, setAdminId]         = useState<number | null>(null);
+  const [adminRole, setAdminRole]     = useState('admin');
   const [records, setRecords]         = useState<ParkingRecord[]>([]);
   const [rates, setRates]             = useState<ParkingRates | null>(null);
   const [loading, setLoading]         = useState(true);
@@ -168,6 +169,7 @@ export default function ParkingRecordsPage() {
         const { admin = {} } = await res.json();
         setAdminName(admin.fullName || admin.username || 'Admin');
         setAdminId(admin.admin_id || admin.id || null);
+        setAdminRole(admin.role || 'admin');
       } catch { router.replace('/login'); }
     })();
   }, [router]);
@@ -353,13 +355,13 @@ export default function ParkingRecordsPage() {
       </div>
 
       <div className="w-full h-screen flex flex-col">
-        <Header adminName={adminName} adminId={adminId} showMenuButton={true} onMenuClick={() => setSidebarOpen(true)} />
+        <Header adminName={adminName} adminId={adminId} adminRole={adminRole} showMenuButton={true} onMenuClick={() => setSidebarOpen(true)} />
 
         <div className="flex-1 p-4 overflow-hidden">
           <div className="bg-white rounded-lg shadow-lg overflow-hidden h-full flex flex-col">
             <div className="px-5 py-3 flex-shrink-0 border-b border-gray-200">
               <div className="flex items-center justify-between gap-3">
-                <h2 className="text-xl font-bold text-gray-800">Vehicle Parking Records</h2>
+                <h2 className="text-xl font-bold text-gray-800">ProLogic's Parking Records</h2>
                 <div className="flex items-center gap-3">
                   {searchTerm.trim() && (
                     <span className={`text-sm font-medium whitespace-nowrap ${totalRecords > 0 ? 'text-green-600' : 'text-red-500'}`}>
@@ -451,7 +453,7 @@ export default function ParkingRecordsPage() {
                           <td className="px-4 py-3 text-sm text-gray-900">
                             <div className="min-w-[220px] space-y-2.5">
                               {!isExited && (
-                                <div className="grid grid-cols-2 gap-2">
+                                <div className={`grid ${record.public_url && adminRole === 'superadmin' ? 'grid-cols-2' : 'grid-cols-1'} gap-2`}>
                                   {record.public_url && (
                                     <a href={record.public_url} target="_blank" rel="noopener noreferrer"
                                       className="inline-flex items-center justify-center gap-1.5 px-3 py-2 border border-sky-200 bg-sky-50 text-sky-700 text-xs font-semibold rounded-lg hover:bg-sky-100 transition-colors">
@@ -459,11 +461,13 @@ export default function ParkingRecordsPage() {
                                       View Page
                                     </a>
                                   )}
+                                  {adminRole === 'superadmin' && (
                                   <button onClick={() => handleForceExit(record.id)} disabled={isExitLoading}
                                     className={`inline-flex items-center justify-center gap-1.5 px-3 py-2 border border-orange-200 bg-orange-50 text-orange-700 text-xs font-semibold rounded-lg hover:bg-orange-100 transition-colors disabled:opacity-50 ${record.public_url ? '' : 'col-span-2'}`}>
                                     <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
                                     {isExitLoading ? 'Processing...' : 'Force Exit'}
                                   </button>
+                                  )}
                                 </div>
                               )}
 
@@ -488,11 +492,13 @@ export default function ParkingRecordsPage() {
                                 <span className="inline-flex items-center px-2 py-1 rounded-full text-[11px] font-semibold bg-emerald-100 text-emerald-700">+{extraMins} free min</span>
                               )}
 
+                              {adminRole === 'superadmin' && (
                               <button onClick={() => handleDelete(record.id)} disabled={isDeleteLoading}
                                 className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 border border-red-200 bg-red-50 text-red-700 text-xs font-semibold rounded-lg hover:bg-red-100 transition-colors disabled:opacity-50">
                                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                                 {isDeleteLoading ? 'Deleting...' : 'Delete Record'}
                               </button>
+                              )}
                             </div>
                           </td>
                         </tr>

@@ -49,6 +49,7 @@ function ConfirmModal({ message, warning, confirmLabel = 'OK', confirmClassName,
 interface HeaderProps {
   adminName: string;
   adminId: number | null;
+  adminRole?: string;
   currentDate?: string;
   onDateChange?: (date: string) => void;
   showDatePicker?: boolean;
@@ -59,6 +60,7 @@ interface HeaderProps {
 export default function Header({
   adminName,
   adminId,
+  adminRole,
   currentDate,
   onDateChange,
   showDatePicker = false,
@@ -308,7 +310,7 @@ export default function Header({
                 <div className="flex items-center space-x-2">
                   <div className="text-sm">
                     <div className="text-gray-900 font-medium">{adminName}</div>
-                    <div className="text-gray-500">{t('header.admin')}</div>
+                    <div className="text-gray-500">{adminRole === 'superadmin' ? 'Super Admin' : t('header.admin')}</div>
                   </div>
                   <button onClick={() => setShowAdminMenu(!showAdminMenu)} className="p-1 hover:bg-gray-100 rounded transition-colors">
                     <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>

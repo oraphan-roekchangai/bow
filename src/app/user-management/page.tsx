@@ -66,6 +66,7 @@ export default function UserManagement() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [adminName, setAdminName]     = useState('Admin');
   const [adminId, setAdminId]         = useState<number | null>(null);
+  const [adminRole, setAdminRole]     = useState('admin');
   const [users, setUsers]             = useState<User[]>([]);
   const [loading, setLoading]         = useState(true);
   const [error, setError]             = useState('');
@@ -89,6 +90,7 @@ export default function UserManagement() {
         const { admin = {} } = await res.json();
         setAdminName(admin.fullName || admin.username || 'Admin');
         setAdminId(admin.admin_id || admin.id || null);
+        setAdminRole(admin.role || 'admin');
       } catch { router.replace('/pop'); }
     })();
   }, [router]);
@@ -244,11 +246,11 @@ export default function UserManagement() {
       </div>
 
       <div className="w-full h-screen flex flex-col">
-        <Header adminName={adminName} adminId={adminId} showMenuButton={true} onMenuClick={() => setSidebarOpen(true)} />
+        <Header adminName={adminName} adminId={adminId} adminRole={adminRole} showMenuButton={true} onMenuClick={() => setSidebarOpen(true)} />
 
         <div className="flex-1 p-4 overflow-hidden">
           <div className="bg-white rounded-lg shadow-lg overflow-hidden h-full flex flex-col">
-            <div className="p-3 flex-shrink-0">
+            <div className="px-5 py-3 flex-shrink-0">
               <div className="flex items-center justify-between gap-3">
                 <h2 className="text-xl font-bold text-gray-800">{t('user.title')}</h2>
                 <div className="flex items-center gap-3">

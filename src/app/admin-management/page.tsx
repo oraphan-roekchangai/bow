@@ -50,7 +50,7 @@ interface Admin {
   phoneNumber: string;
   password: string;
   joinDate: string;
-  role?: string;
+  role: string;
 }
 
 const navItems = [
@@ -69,13 +69,20 @@ export default function AdminManagement() {
   const [error, setError]             = useState('');
   const [adminName, setAdminName]     = useState('Admin');
   const [adminId, setAdminId]         = useState<number | null>(null);
+  const [adminRole, setAdminRole]     = useState('admin');
   const [editingId, setEditingId]     = useState<number | null>(null);
-  const [editForm, setEditForm]       = useState({ fullName: '', username: '', email: '', phoneNumber: '', password: '' });
+  const [editForm, setEditForm]       = useState({ fullName: '', username: '', email: '', phoneNumber: '', password: '', role: 'admin' });
   const [saving, setSaving]           = useState(false);
   const [deletingId, setDeletingId]   = useState<number | null>(null);
   const [modal, setModal]             = useState<ModalState | null>(null);
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [addForm, setAddForm]         = useState({ username: '', fullName: '', email: '', phoneNumber: '', password: '' });
+  const [addSaving, setAddSaving]     = useState(false);
   const { t } = useLanguage();
   const router = useRouter();
+
+  const isSuperAdmin = adminRole === 'superadmin';
+  const isRootAdmin = adminId === 1;
 
   const showModal = (m: ModalState) => setModal(m);
   const closeModal = () => setModal(null);
@@ -88,6 +95,7 @@ export default function AdminManagement() {
         const { admin = {} } = await res.json();
         setAdminName(admin.fullName || admin.username || 'Admin');
         setAdminId(admin.admin_id || admin.id || null);
+        setAdminRole(admin.role || 'admin');
       } catch { router.replace('/login'); }
     })();
   }, [router]);
@@ -111,17 +119,35 @@ export default function AdminManagement() {
 
   const startEditing = (admin: Admin) => {
     setEditingId(admin.id);
-    setEditForm({ fullName: admin.fullName, username: admin.username, email: admin.email, phoneNumber: admin.phoneNumber, password: '' });
+    setEditForm({ fullName: admin.fullName, username: admin.username, email: admin.email, phoneNumber: admin.phoneNumber, password: '', role: admin.role || 'admin' });
   };
 
   const cancelEditing = () => {
     setEditingId(null);
-    setEditForm({ fullName: '', username: '', email: '', phoneNumber: '', password: '' });
+    setEditForm({ fullName: '', username: '', email: '', phoneNumber: '', password: '', role: 'admin' });
     setSaving(false);
   };
 
   const handleEditChange = (field: keyof typeof editForm, value: string) =>
     setEditForm((prev) => ({ ...prev, [field]: value }));
+
+  const canEditAdmin = (targetAdmin: Admin) => {
+    if (isSuperAdmin) return true;
+    return targetAdmin.id === adminId; // regular admin can only edit self
+  };
+
+  const canDeleteAdmin = (targetAdmin: Admin) => {
+    if (!isSuperAdmin) return false;
+    if (targetAdmin.id === adminId) return false; // can't delete self
+    if (targetAdmin.id === 1) return false; // can't delete root
+    return true;
+  };
+
+  const canEditRole = (targetAdmin: Admin) => {
+    if (!isRootAdmin) return false; // only admin_id 1 can change roles
+    if (targetAdmin.id === 1) return false; // can't change root's own role
+    return true;
+  };
 
   const saveAdmin = async () => {
     if (editingId === null) return;
@@ -137,9 +163,14 @@ export default function AdminManagement() {
         closeModal();
         setSaving(true);
         const payload: Record<string, string | number> = { id: editingId!, fullName: editForm.fullName.trim(), username: editForm.username.trim(), email: editForm.email.trim(), phoneNumber: editForm.phoneNumber.trim() };
-        if (editForm.password.trim()) payload.password = editForm.password.trim();
+        if (editForm.password.trim()) { payload.password = editForm.password.trim(); }
+        // Only send role if root admin is editing someone else's role
+        const targetAdmin = admins.find(a => a.id === editingId);
+        if (isRootAdmin && targetAdmin && targetAdmin.id !== 1) {
+          payload.role = editForm.role;
+        }
         try {
-          const res = await fetch('/api/admin/admins', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+          const res = await fetch('/api/admin/admins', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify(payload) });
           const data = await res.json();
           if (!res.ok || !data.success) throw new Error(data.error || 'Failed to update admin');
           setAdmins((prev) => prev.map((a) => (a.id === editingId ? data.admin : a)));
@@ -163,7 +194,7 @@ export default function AdminManagement() {
         closeModal();
         setDeletingId(id);
         try {
-          const res = await fetch('/api/admin/admins', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) });
+          const res = await fetch('/api/admin/admins', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ id }) });
           const data = await res.json();
           if (!res.ok || !data.success) throw new Error(data.error || 'Failed to delete');
           setAdmins((prev) => prev.filter((a) => a.id !== id));
@@ -172,6 +203,46 @@ export default function AdminManagement() {
           showModal({ message: (err as Error).message || 'Failed to delete admin', confirmLabel: 'OK', hideCancel: true, confirmClassName: 'px-7 py-2.5 rounded-lg text-sm font-medium bg-red-600 text-white hover:bg-red-700 transition-colors', onConfirm: closeModal });
         } finally {
           setDeletingId(null);
+        }
+      },
+    });
+  };
+
+  const handleAddAdmin = async () => {
+    if (!addForm.username.trim() || !addForm.fullName.trim() || !addForm.email.trim() || !addForm.phoneNumber.trim() || !addForm.password.trim()) {
+      showModal({ message: 'All fields are required', confirmLabel: 'OK', hideCancel: true, confirmClassName: 'px-7 py-2.5 rounded-lg text-sm font-medium bg-emerald-600 text-white hover:bg-emerald-700 transition-colors', onConfirm: closeModal });
+      return;
+    }
+    showModal({
+      message: `Create new admin "${addForm.username.trim()}"?`,
+      confirmLabel: 'Create',
+      confirmClassName: 'px-7 py-2.5 rounded-lg text-sm font-medium bg-emerald-600 text-white hover:bg-emerald-700 transition-colors',
+      onConfirm: async () => {
+        closeModal();
+        setAddSaving(true);
+        try {
+          const res = await fetch('/api/admin/auth/signup', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({
+              username: addForm.username.trim(),
+              fullName: addForm.fullName.trim(),
+              email: addForm.email.trim(),
+              phoneNumber: addForm.phoneNumber.trim(),
+              password: addForm.password.trim(),
+            }),
+          });
+          const data = await res.json();
+          if (!res.ok || !data.success) throw new Error(data.error || 'Failed to create admin');
+          setAdmins((prev) => [data.admin, ...prev]);
+          setAddForm({ username: '', fullName: '', email: '', phoneNumber: '', password: '' });
+          setShowAddForm(false);
+          showModal({ message: `Admin "${addForm.username.trim()}" created successfully`, confirmLabel: 'OK', hideCancel: true, confirmClassName: 'px-7 py-2.5 rounded-lg text-sm font-medium bg-emerald-600 text-white hover:bg-emerald-700 transition-colors', onConfirm: closeModal });
+        } catch (err) {
+          showModal({ message: (err as Error).message || 'Failed to create admin', confirmLabel: 'OK', hideCancel: true, confirmClassName: 'px-7 py-2.5 rounded-lg text-sm font-medium bg-red-600 text-white hover:bg-red-700 transition-colors', onConfirm: closeModal });
+        } finally {
+          setAddSaving(false);
         }
       },
     });
@@ -200,13 +271,48 @@ export default function AdminManagement() {
       </div>
 
       <div className="w-full h-screen flex flex-col">
-        <Header adminName={adminName} adminId={adminId} showMenuButton={true} onMenuClick={() => setSidebarOpen(true)} />
+        <Header adminName={adminName} adminId={adminId} adminRole={adminRole} showMenuButton={true} onMenuClick={() => setSidebarOpen(true)} />
 
         <div className="flex-1 p-4 overflow-hidden">
           <div className="bg-white rounded-lg shadow-lg overflow-hidden h-full flex flex-col">
-            <div className="p-3 flex-shrink-0">
-              <h2 className="text-xl font-bold text-gray-800">{t('admin.title')}</h2>
+            <div className="px-5 py-3 flex-shrink-0">
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl font-bold text-gray-800">{t('admin.title')}</h2>
+                {isSuperAdmin && (
+                  <button onClick={() => setShowAddForm(!showAddForm)}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-600 text-white text-sm font-semibold rounded-lg hover:bg-emerald-700 transition-colors">
+                    <MaterialIcon name={showAddForm ? 'close' : 'person_add'} size="small" className="text-white" />
+                    <span>{showAddForm ? 'Cancel' : 'Add Admin'}</span>
+                  </button>
+                )}
+              </div>
             </div>
+
+            {/* Add Admin Form */}
+            {showAddForm && isSuperAdmin && (
+              <div className="px-3 pb-3 flex-shrink-0">
+                <div className="border border-emerald-200 bg-emerald-50/50 rounded-xl p-4">
+                  <h3 className="text-sm font-bold text-emerald-800 mb-3">Create New Admin</h3>
+                  <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+                    <input type="text" placeholder="Username" value={addForm.username} onChange={(e) => setAddForm(p => ({ ...p, username: e.target.value }))}
+                      className="px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500" />
+                    <input type="text" placeholder="Full Name" value={addForm.fullName} onChange={(e) => setAddForm(p => ({ ...p, fullName: e.target.value }))}
+                      className="px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500" />
+                    <input type="email" placeholder="Email" value={addForm.email} onChange={(e) => setAddForm(p => ({ ...p, email: e.target.value }))}
+                      className="px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500" />
+                    <input type="text" placeholder="Phone (10 digits)" value={addForm.phoneNumber} onChange={(e) => setAddForm(p => ({ ...p, phoneNumber: e.target.value }))}
+                      className="px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500" />
+                    <input type="password" placeholder="Password (6-20 chars)" value={addForm.password} onChange={(e) => setAddForm(p => ({ ...p, password: e.target.value }))}
+                      className="px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500" />
+                    <button onClick={handleAddAdmin} disabled={addSaving}
+                      className="px-4 py-2 bg-emerald-600 text-white text-sm font-semibold rounded-lg hover:bg-emerald-700 transition-colors disabled:opacity-50">
+                      {addSaving ? 'Creating...' : 'Create Admin'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div className="flex-1 overflow-y-auto">
               {loading ? (
                 <div className="flex items-center justify-center h-full">
@@ -225,9 +331,11 @@ export default function AdminManagement() {
                 <table className="w-full border-collapse">
                   <thead className="bg-gray-100 sticky top-0 z-10">
                     <tr>
-                      {['admin.fullName','admin.username','admin.email','admin.phone','admin.password','admin.joinDate','admin.actions'].map((k) => (
-                        <th key={k} className="px-6 py-4 text-left text-sm font-bold text-gray-800 border-r border-gray-300 last:border-r-0">{t(k)}</th>
+                      {['admin.fullName','admin.username','admin.email','admin.phone','admin.password','admin.joinDate'].map((k) => (
+                        <th key={k} className="px-6 py-4 text-left text-sm font-bold text-gray-800 border-r border-gray-300">{t(k)}</th>
                       ))}
+                      <th className="px-6 py-4 text-left text-sm font-bold text-gray-800 border-r border-gray-300">Role</th>
+                      <th className="px-6 py-4 text-left text-sm font-bold text-gray-800">{t('admin.actions')}</th>
                     </tr>
                   </thead>
                   <tbody className="bg-white">
@@ -248,48 +356,52 @@ export default function AdminManagement() {
                           ) : admin.password}
                         </td>
                         <td className="px-6 py-4 text-sm text-gray-900 border-r border-gray-200">{admin.joinDate}</td>
+                        {/* Role column */}
+                        <td className="px-6 py-4 text-sm text-gray-900 border-r border-gray-200">
+                          {editingId === admin.id && canEditRole(admin) ? (
+                            <select value={editForm.role} onChange={(e) => handleEditChange('role', e.target.value)}
+                              className="w-full bg-transparent border-b border-gray-300 py-1 text-sm focus:border-green-500 focus:outline-none">
+                              <option value="admin">Admin</option>
+                              <option value="superadmin">Super Admin</option>
+                            </select>
+                          ) : (
+                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold ${
+                              admin.role === 'superadmin' ? 'bg-purple-100 text-purple-700 border border-purple-300' : 'bg-gray-100 text-gray-600 border border-gray-300'
+                            }`}>
+                              {admin.role === 'superadmin' ? 'Super Admin' : 'Admin'}
+                            </span>
+                          )}
+                        </td>
+                        {/* Actions */}
                         <td className="px-6 py-4 text-sm text-gray-900">
                           {editingId === admin.id ? (
                             <div className="flex items-center gap-2">
-                              <button
-                                onClick={saveAdmin}
-                                disabled={saving}
-                                className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-emerald-200 bg-emerald-50 text-emerald-700 text-xs font-semibold rounded-lg hover:bg-emerald-100 transition-colors disabled:opacity-50"
-                              >
+                              <button onClick={saveAdmin} disabled={saving}
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-emerald-200 bg-emerald-50 text-emerald-700 text-xs font-semibold rounded-lg hover:bg-emerald-100 transition-colors disabled:opacity-50">
                                 <MaterialIcon name="check" size="small" className="text-emerald-700" />
                                 <span>{saving ? `${t('common.save')}...` : t('common.save')}</span>
                               </button>
-                              <button
-                                onClick={cancelEditing}
-                                className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-gray-300 bg-gray-100 text-gray-700 text-xs font-semibold rounded-lg hover:bg-gray-200 transition-colors"
-                              >
+                              <button onClick={cancelEditing}
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-gray-300 bg-gray-100 text-gray-700 text-xs font-semibold rounded-lg hover:bg-gray-200 transition-colors">
                                 <MaterialIcon name="close" size="small" className="text-gray-700" />
                                 <span>{t('common.cancel')}</span>
                               </button>
                             </div>
                           ) : (
                             <div className="flex items-center gap-2">
-                              <button
-                                onClick={() => startEditing(admin)}
-                                className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-sky-200 bg-sky-50 text-sky-700 text-xs font-semibold rounded-lg hover:bg-sky-100 transition-colors"
-                              >
-                                <MaterialIcon name="edit" size="small" className="text-sky-700" />
-                                <span>{t('common.edit')}</span>
-                              </button>
-                              <button
-                                onClick={() => handleDelete(admin.id)}
-                                disabled={deletingId === admin.id}
-                                className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-red-200 bg-red-50 text-red-700 text-xs font-semibold rounded-lg hover:bg-red-100 transition-colors disabled:opacity-50"
-                              >
-                                {deletingId === admin.id ? (
-                                  <span>...</span>
-                                ) : (
-                                  <>
-                                    <MaterialIcon name="delete" size="small" className="text-red-700" />
-                                    <span>{t('common.delete')}</span>
-                                  </>
-                                )}
-                              </button>
+                              {canEditAdmin(admin) && (
+                                <button onClick={() => startEditing(admin)}
+                                  className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-sky-200 bg-sky-50 text-sky-700 text-xs font-semibold rounded-lg hover:bg-sky-100 transition-colors">
+                                  <MaterialIcon name="edit" size="small" className="text-sky-700" />
+                                  <span>{t('common.edit')}</span>
+                                </button>
+                              )}
+                              {canDeleteAdmin(admin) && (
+                                <button onClick={() => handleDelete(admin.id)} disabled={deletingId === admin.id}
+                                  className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-red-200 bg-red-50 text-red-700 text-xs font-semibold rounded-lg hover:bg-red-100 transition-colors disabled:opacity-50">
+                                  {deletingId === admin.id ? <span>...</span> : <><MaterialIcon name="delete" size="small" className="text-red-700" /><span>{t('common.delete')}</span></>}
+                                </button>
+                              )}
                             </div>
                           )}
                         </td>

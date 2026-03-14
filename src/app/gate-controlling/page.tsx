@@ -19,6 +19,7 @@ export default function GateControlling() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [adminName, setAdminName]     = useState('Admin');
   const [adminId, setAdminId]         = useState<number | null>(null);
+  const [adminRole, setAdminRole]     = useState('admin');
   const [gateStatus, setGateStatus]   = useState({ main: 'CLOSED', vip: 'CLOSED', exit: 'CLOSED' });
   const [systemStatus, setSystemStatus] = useState({ camera: 'ONLINE', operation: 'ON' });
   const { t } = useLanguage();
@@ -32,6 +33,7 @@ export default function GateControlling() {
         const { admin = {} } = await res.json();
         setAdminName(admin.fullName || admin.username || 'Admin');
         setAdminId(admin.admin_id || admin.id || null);
+        setAdminRole(admin.role || 'admin');
       } catch { router.replace('/login'); }
     })();
   }, [router]);
@@ -63,7 +65,7 @@ export default function GateControlling() {
       </div>
 
       <div className="flex flex-col h-screen w-full">
-        <Header adminName={adminName} adminId={adminId} showMenuButton={true} onMenuClick={() => setSidebarOpen(true)} />
+        <Header adminName={adminName} adminId={adminId} adminRole={adminRole} showMenuButton={true} onMenuClick={() => setSidebarOpen(true)} />
 
         <main className="flex-1 overflow-auto bg-gray-50">
           <div className="container mx-auto p-8 max-w-6xl">

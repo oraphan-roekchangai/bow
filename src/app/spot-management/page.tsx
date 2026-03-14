@@ -81,6 +81,7 @@ export default function SpotManagement() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [adminName, setAdminName] = useState('Admin');
   const [adminId, setAdminId] = useState<number | null>(null);
+  const [adminRole, setAdminRole]     = useState('admin');
   const [lots, setLots] = useState<ParkingLot[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -100,6 +101,7 @@ export default function SpotManagement() {
         const { admin = {} } = await res.json();
         setAdminName(admin.fullName || admin.username || 'Admin');
         setAdminId(admin.admin_id || admin.id || null);
+        setAdminRole(admin.role || 'admin');
       } catch { router.replace('/login'); }
     })();
   }, [router]);
@@ -260,7 +262,7 @@ export default function SpotManagement() {
       </div>
 
       <div className="w-full h-screen flex flex-col">
-        <Header adminName={adminName} adminId={adminId} showMenuButton={true} onMenuClick={() => setSidebarOpen(true)} />
+        <Header adminName={adminName} adminId={adminId} adminRole={adminRole} showMenuButton={true} onMenuClick={() => setSidebarOpen(true)} />
 
         <div className="flex-1 p-4 overflow-auto">
           {/* Summary Cards */}

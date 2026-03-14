@@ -37,6 +37,7 @@ export default function Dashboard() {
   const [sidebarOpen, setSidebarOpen]   = useState(false);
   const [adminName, setAdminName]       = useState("Admin");
   const [adminId, setAdminId]           = useState<number | null>(null);
+  const [adminRole, setAdminRole]     = useState('admin');
   const [chartData, setChartData]       = useState<any>(null);
   const [loading, setLoading]           = useState(true);
   const [currentDate, setCurrentDate]   = useState(new Date().toISOString().split("T")[0]);
@@ -71,6 +72,7 @@ export default function Dashboard() {
         const { admin = {} } = await res.json();
         setAdminName(admin.fullName || admin.username || "Admin");
         setAdminId(admin.admin_id || admin.id || null);
+        setAdminRole(admin.role || 'admin');
       } catch {
         router.replace("/login");
       }
@@ -320,6 +322,7 @@ export default function Dashboard() {
       <Header
         adminName={adminName}
         adminId={adminId}
+        adminRole={adminRole}
         currentDate={currentDate}
         onDateChange={setCurrentDate}
         showDatePicker={true}
