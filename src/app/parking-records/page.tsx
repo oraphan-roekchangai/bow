@@ -20,6 +20,11 @@ interface Member {
   status: 'regular' | 'vip';
 }
 
+interface ParkingRates {
+  rate_per_hour: number;
+  minimum_fee: number;
+}
+
 const navItems = [
   { href: '/dashboard',        icon: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6', key: 'sidebar.dashboard' },
   { href: '/parking-records',  icon: 'M9 17h6m-6-4h6m2 8H7a2 2 0 01-2-2V7a2 2 0 012-2h5l5 5v9a2 2 0 01-2 2z',                                                                             key: 'sidebar.parkingRecords', active: true },
@@ -39,10 +44,38 @@ const formatDuration = (entry: string, exit: string | null) => {
   const start = new Date(entry).getTime();
   const end   = exit ? new Date(exit).getTime() : Date.now();
   if (isNaN(start) || isNaN(end) || end < start) return '-';
-  const mins  = Math.floor((end - start) / 60000);
+  const mins = Math.floor((end - start) / 60000);
   const h = Math.floor(mins / 60), m = mins % 60;
   return h === 0 ? `${m}m` : `${h}h ${m}m`;
 };
+
+// Mirror of server's fee.js
+function getFreeMinutes(memberStatus: string | null): number {
+  if (memberStatus === 'vip' || memberStatus === 'regular') return 120;
+  return 60;
+}
+
+function ceilDiv(a: number, b: number): number {
+  return Math.floor((a + b - 1) / b);
+}
+
+function calculateFee(
+  checkIn: string,
+  checkOut: string | null,
+  memberStatus: string | null,
+  rates: ParkingRates
+): number {
+  const start = new Date(checkIn).getTime();
+  const end   = checkOut ? new Date(checkOut).getTime() : Date.now();
+  if (isNaN(start) || isNaN(end) || end < start) return 0;
+  const durationMinutes = Math.floor((end - start) / 60000);
+  const freeMinutes     = getFreeMinutes(memberStatus);
+  const billableMinutes = Math.max(0, durationMinutes - freeMinutes);
+  if (billableMinutes === 0) return 0;
+  const billableHours = ceilDiv(billableMinutes, 60);
+  const fee = billableHours * Number(rates.rate_per_hour);
+  return Number(Math.max(fee, Number(rates.minimum_fee)).toFixed(2));
+}
 
 export default function ParkingRecordsPage() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -50,11 +83,19 @@ export default function ParkingRecordsPage() {
   const [adminId, setAdminId]         = useState<number | null>(null);
   const [records, setRecords]         = useState<ParkingRecord[]>([]);
   const [members, setMembers]         = useState<Member[]>([]);
+  const [rates, setRates]             = useState<ParkingRates | null>(null);
   const [loading, setLoading]         = useState(true);
   const [error, setError]             = useState('');
   const [searchTerm, setSearchTerm]   = useState('');
+  const [now, setNow]                 = useState(Date.now());
   const { t } = useLanguage();
   const router = useRouter();
+
+  // Tick every 60s to update live fees for parked cars
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 60000);
+    return () => clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     (async () => {
@@ -101,6 +142,16 @@ export default function ParkingRecordsPage() {
     })();
   }, []);
 
+  useEffect(() => {
+    (async () => {
+      try {
+        const res  = await fetch('/api/admin/parking-rates', { credentials: 'include', cache: 'no-store' });
+        const body = await res.json();
+        if (res.ok && body.success) setRates(body.data);
+      } catch { /* fall back to DB fee value */ }
+    })();
+  }, []);
+
   const memberStatusByPlate = useMemo(() => {
     const map = new Map<string, 'regular' | 'vip'>();
     members.forEach((m) => map.set(m.licensePlate, m.status));
@@ -111,13 +162,15 @@ export default function ParkingRecordsPage() {
     const term = searchTerm.trim().toLowerCase();
     if (!term) return records;
     return records.filter((r) =>
-      [r.detected_plate, r.exit_time ? 'exited' : 'parked', r.entry_time, r.exit_time || '', r.parking_fee != null ? String(r.parking_fee) : '']
+      [r.detected_plate, r.exit_time ? 'exited' : 'parked', r.entry_time, r.exit_time || '']
         .join(' ').toLowerCase().includes(term)
     );
-  }, [records, searchTerm]);
+  // now in deps so live fee rows re-render every minute
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [records, searchTerm, now]);
 
   return (
-    <div className="h-screen bg-gray-50 overflow-hidden">
+    <div className="h-screen bg-green-50 overflow-hidden">
       {/* Sidebar */}
       <div className={`fixed left-0 top-0 h-full w-64 bg-white shadow-lg transform transition-transform duration-300 z-40 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         <div className="p-6">
@@ -129,7 +182,7 @@ export default function ParkingRecordsPage() {
           </div>
           <nav className="space-y-4">
             {navItems.map((item) => (
-              <Link key={item.href} href={item.href} className={`flex items-center space-x-3 p-3 rounded-lg ${item.active ? 'text-white bg-green-600' : 'text-gray-600 hover:text-gray-800 hover:bg-gray-100'}`}>
+              <Link key={item.href} href={item.href} className={`flex items-center space-x-3 p-3 rounded-lg ${(item as any).active ? 'text-white bg-green-600' : 'text-gray-600 hover:text-gray-800 hover:bg-gray-100'}`}>
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={item.icon} /></svg>
                 <span>{t(item.key)}</span>
               </Link>
@@ -138,8 +191,14 @@ export default function ParkingRecordsPage() {
         </div>
       </div>
 
+      {!sidebarOpen && (
+        <button aria-label="Open sidebar" onClick={() => setSidebarOpen(true)} className="fixed left-0 top-1/2 -translate-y-1/2 z-50 bg-white border border-gray-300 shadow-lg hover:bg-gray-50 flex items-center justify-center rounded-r-lg px-1 py-6">
+          <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+        </button>
+      )}
+
       <div className="w-full h-screen flex flex-col">
-        <Header adminName={adminName} adminId={adminId} showMenuButton={true} onMenuClick={() => setSidebarOpen(true)} />
+        <Header adminName={adminName} adminId={adminId} />
 
         <div className="flex-1 p-4 overflow-hidden">
           <div className="bg-white rounded-lg shadow-lg overflow-hidden h-full flex flex-col">
@@ -170,17 +229,37 @@ export default function ParkingRecordsPage() {
                   </thead>
                   <tbody>
                     {filteredRecords.length > 0 ? filteredRecords.map((record) => {
-                      const isExited    = Boolean(record.exit_time);
-                      const plateKey    = (record.detected_plate || '').trim().toLowerCase();
+                      const isExited     = Boolean(record.exit_time);
+                      const plateKey     = (record.detected_plate || '').trim().toLowerCase();
                       const memberStatus = memberStatusByPlate.get(plateKey) || null;
+
+                      // Fee display logic:
+                      // - Exited + fee in DB → show settled amount
+                      // - Otherwise → calculate live from formula
+                      let displayFee: string;
+                      if (isExited && record.parking_fee != null) {
+                        displayFee = `฿${Number(record.parking_fee).toFixed(2)}`;
+                      } else if (rates) {
+                        const liveFee = calculateFee(record.entry_time, record.exit_time, memberStatus, rates);
+                        displayFee = `฿${liveFee.toFixed(2)}${!isExited ? ' *' : ''}`;
+                      } else {
+                        displayFee = record.parking_fee != null ? `฿${Number(record.parking_fee).toFixed(2)}` : '-';
+                      }
+
+                      // Member status label
+                      let memberLabel: React.ReactNode;
+                      if (memberStatus === 'vip') {
+                        memberLabel = <span className="px-3 py-1 text-sm font-medium rounded text-red-800">{t('user.vip')}</span>;
+                      } else if (memberStatus === 'regular') {
+                        memberLabel = <span className="px-3 py-1 text-sm font-medium rounded text-gray-800">{t('user.regular')}</span>;
+                      } else {
+                        memberLabel = <span className="px-3 py-1 text-sm font-medium rounded text-gray-500">Non-member</span>;
+                      }
+
                       return (
                         <tr key={record.id} className="border-b border-gray-200 hover:bg-gray-50">
                           <td className="px-6 py-4 text-sm text-gray-900 border-r border-gray-200">{record.detected_plate || '-'}</td>
-                          <td className="px-6 py-4 text-sm text-gray-900 border-r border-gray-200">
-                            {memberStatus
-                              ? <span className={`px-3 py-1 text-sm font-medium rounded ${memberStatus === 'vip' ? 'text-red-800' : 'text-gray-800'}`}>{memberStatus === 'vip' ? t('user.vip') : t('user.regular')}</span>
-                              : <span className="text-gray-400">--</span>}
-                          </td>
+                          <td className="px-6 py-4 text-sm text-gray-900 border-r border-gray-200">{memberLabel}</td>
                           <td className="px-6 py-4 text-sm text-gray-900 border-r border-gray-200">
                             <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${isExited ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
                               {isExited ? 'Exited' : 'Parked'}
@@ -189,7 +268,7 @@ export default function ParkingRecordsPage() {
                           <td className="px-6 py-4 text-sm text-gray-900 border-r border-gray-200">{formatDateTime(record.entry_time)}</td>
                           <td className="px-6 py-4 text-sm text-gray-900 border-r border-gray-200">{formatDateTime(record.exit_time)}</td>
                           <td className="px-6 py-4 text-sm text-gray-900 border-r border-gray-200">{formatDuration(record.entry_time, record.exit_time)}</td>
-                          <td className="px-6 py-4 text-sm text-gray-900 font-medium">{record.parking_fee != null ? `฿${Number(record.parking_fee).toFixed(2)}` : '-'}</td>
+                          <td className="px-6 py-4 text-sm text-gray-900 font-medium">{displayFee}</td>
                         </tr>
                       );
                     }) : (
@@ -199,6 +278,13 @@ export default function ParkingRecordsPage() {
                 </table>
               )}
             </div>
+
+            {/* Footer note */}
+            {rates && (
+              <div className="px-4 py-2 text-xs text-gray-400 border-t border-gray-100">
+                * Estimated fee, updates every minute — Rate: ฿{rates.rate_per_hour}/hr · Min fee: ฿{rates.minimum_fee} · Free: 60 min (120 min for members)
+              </div>
+            )}
           </div>
         </div>
       </div>
