@@ -142,26 +142,26 @@ export default function ParkingRecordsPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [records, searchTerm, now]);
 
-  const setLoading = (key: string, val: boolean) =>
+  const setActionState = (key: string, val: boolean) =>
     setActionLoading(prev => ({ ...prev, [key]: val }));
 
   const handleForceExit = async (id: number) => {
     if (!confirm('Force this car to exit now?')) return;
-    setLoading(`exit-${id}`, true);
+    setActionState(`exit-${id}`, true);
     try {
       const res  = await fetch('/api/admin/parking/force-exit', { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ id }) });
       const data = await res.json();
       if (!res.ok || !data.success) throw new Error(data.error || 'Failed');
       setRecords(prev => prev.map(r => r.id === id ? { ...r, exit_time: new Date().toISOString() } : r));
     } catch (err) { alert((err as Error).message); }
-    finally { setLoading(`exit-${id}`, false); }
+    finally { setActionState(`exit-${id}`, false); }
   };
 
   const handleAddFreeMinutes = async (id: number) => {
     const mins = parseInt(freeMinInput[id] || '');
     if (isNaN(mins) || mins <= 0) { alert('Enter a valid number of minutes'); return; }
     if (!confirm(`Add ${mins} free minutes to this record?`)) return;
-    setLoading(`free-${id}`, true);
+    setActionState(`free-${id}`, true);
     try {
       const res  = await fetch('/api/admin/parking/free-minutes', { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ id, minutes: mins }) });
       const data = await res.json();
@@ -169,19 +169,19 @@ export default function ParkingRecordsPage() {
       setRecords(prev => prev.map(r => r.id === id ? { ...r, extra_free_minutes: data.extra_free_minutes } : r));
       setFreeMinInput(prev => ({ ...prev, [id]: '' }));
     } catch (err) { alert((err as Error).message); }
-    finally { setLoading(`free-${id}`, false); }
+    finally { setActionState(`free-${id}`, false); }
   };
 
   const handleDelete = async (id: number) => {
     if (!confirm('Permanently delete this parking record? This cannot be undone.')) return;
-    setLoading(`del-${id}`, true);
+    setActionState(`del-${id}`, true);
     try {
       const res  = await fetch('/api/admin/parking', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ id }) });
       const data = await res.json();
       if (!res.ok || !data.success) throw new Error(data.error || 'Failed');
       setRecords(prev => prev.filter(r => r.id !== id));
     } catch (err) { alert((err as Error).message); }
-    finally { setLoading(`del-${id}`, false); }
+    finally { setActionState(`del-${id}`, false); }
   };
 
   return (
