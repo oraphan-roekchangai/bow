@@ -86,7 +86,10 @@ export default function ParkingRecordsPage() {
   const [freeMinInput, setFreeMinInput]   = useState<{[id: number]: string}>({});
   const [sortCol, setSortCol]             = useState<SortCol | null>(null);
   const [sortDir, setSortDir]             = useState<SortDir>('desc');
-  const [memberSortIdx, setMemberSortIdx] = useState(0); // 0=non-member first, 1=regular first, 2=vip first
+  const [memberSortIdx, setMemberSortIdx] = useState(0);
+  const [page, setPage]                   = useState(1);
+  const [totalRecords, setTotalRecords]   = useState(0);
+  const LIMIT = 50; // 0=non-member first, 1=regular first, 2=vip first
   const { t } = useLanguage();
   const router = useRouter();
 
@@ -111,10 +114,11 @@ export default function ParkingRecordsPage() {
     (async () => {
       try {
         setLoading(true);
-        const res  = await fetch('/api/admin/parking?limit=500', { credentials: 'include', cache: 'no-store' });
+        const res  = await fetch(`/api/admin/parking?limit=${LIMIT}&page=${page}`, { credentials: 'include', cache: 'no-store' });
         const body = await res.json();
         if (!res.ok || !body.success) throw new Error(body.error || 'Failed to fetch parking records');
         setRecords(body.data || []);
+        setTotalRecords(body.total || 0);
         setError('');
       } catch (err) {
         setError((err as Error).message);
@@ -123,7 +127,7 @@ export default function ParkingRecordsPage() {
         setLoading(false);
       }
     })();
-  }, []);
+  }, [page]);
 
   useEffect(() => {
     (async () => {
@@ -145,6 +149,9 @@ export default function ParkingRecordsPage() {
     );
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [records, searchTerm, now]);
+
+  // Reset to page 1 when search changes
+  useEffect(() => { setPage(1); }, [searchTerm]);
 
   const handleSort = (col: SortCol) => {
     if (col === 'member') {
@@ -169,7 +176,7 @@ export default function ParkingRecordsPage() {
       let cmp = 0;
       switch (sortCol) {
         case 'plate':
-          cmp = (a.detected_plate || '').localeCompare(b.detected_plate || '');
+          cmp = (a.detected_plate || '').localeCompare(b.detected_plate || '', 'th');
           break;
         case 'member': {
           const ai = ((memberOrder[a.member_status] ?? 0) - memberSortIdx + 3) % 3;
@@ -443,11 +450,25 @@ export default function ParkingRecordsPage() {
               )}
             </div>
 
-            {rates && (
-              <div className="px-4 py-2 text-xs text-gray-400 border-t border-gray-100">
-                Estimated fee updates every minute — Rate: ฿{rates.rate_per_hour}/hr · Min fee: ฿{rates.minimum_fee} · Free: 60 min (120 min for members)
+            {/* Footer: rates note + pagination */}
+            <div className="px-4 py-2 border-t border-gray-100 flex items-center justify-between flex-shrink-0">
+              <div className="text-xs text-gray-400">
+                {rates && <>Estimated fee updates every minute — Rate: ฿{rates.rate_per_hour}/hr · Min fee: ฿{rates.minimum_fee} · Free: 60 min (120 min for members)</>}
               </div>
-            )}
+              <div className="flex items-center gap-3 text-sm text-gray-600">
+                <span>{((page - 1) * LIMIT) + 1}–{Math.min(page * LIMIT, totalRecords)} of {totalRecords.toLocaleString()}</span>
+                <div className="flex items-center gap-1">
+                  <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
+                    className="p-1 rounded hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+                  </button>
+                  <button onClick={() => setPage(p => Math.min(Math.ceil(totalRecords / LIMIT), p + 1))} disabled={page >= Math.ceil(totalRecords / LIMIT)}
+                    className="p-1 rounded hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
