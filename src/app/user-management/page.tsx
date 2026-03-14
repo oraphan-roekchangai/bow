@@ -57,12 +57,26 @@ export default function UserManagement() {
     (async () => {
       try {
         setLoading(true);
-        const res  = await fetch('/api/admin/users', { credentials: 'include', cache: 'no-store' });
-        const body = await res.json();
-        if (!res.ok || !body.success) throw new Error(body.error || 'FETCH_ERROR');
+        const [userRes, plateRes] = await Promise.all([
+          fetch('/api/admin/users', { credentials: 'include', cache: 'no-store' }),
+          fetch('/admin/internal-api/admin/user-plates', { credentials: 'include', cache: 'no-store' }),
+        ]);
+
+        const body = await userRes.json();
+        const plateBody = plateRes.ok ? await plateRes.json() : { success: false, data: {} };
+
+        if (!userRes.ok || !body.success) throw new Error(body.error || 'FETCH_ERROR');
+
+        const plateMap: Record<string, string> =
+          plateBody && plateBody.success && plateBody.data && typeof plateBody.data === 'object'
+            ? plateBody.data
+            : {};
+
         const parsed: User[] = (body.data || []).map((u: any) => ({
           id: u.id, fullName: u.full_name || '', username: u.username ?? null,
-          email: u.email ?? null, phone: u.phone || '', licensePlate: u.license_plate || '',
+          email: u.email ?? null,
+          phone: u.phone || '',
+          licensePlate: plateMap[String(u.id)] || u.license_plate || '',
           joinDate: u.join_date || '', status: u.status?.toLowerCase() === 'vip' ? 'vip' : 'regular',
         }));
         setUsers(parsed);
@@ -113,7 +127,9 @@ export default function UserManagement() {
       if (!res.ok || !data.success) throw new Error(data.error || 'Failed to update user');
       const updated: User = {
         id: data.data.id, fullName: data.data.full_name || '', username: data.data.username ?? null,
-        email: data.data.email ?? null, phone: data.data.phone || '', licensePlate: data.data.license_plate || '',
+        email: data.data.email ?? null,
+        phone: data.data.phone || '',
+        licensePlate: editForm.licensePlate.trim() || data.data.license_plate || '',
         joinDate: data.data.join_date || '', status: data.data.status?.toLowerCase() === 'vip' ? 'vip' : 'regular',
       };
       setUsers((prev) => prev.map((u) => (u.id === updated.id ? updated : u)));
@@ -173,14 +189,8 @@ export default function UserManagement() {
         </div>
       </div>
 
-      {!sidebarOpen && (
-        <button aria-label="Open sidebar" onClick={() => setSidebarOpen(true)} className="fixed left-0 top-1/2 -translate-y-1/2 z-50 bg-white border border-gray-300 shadow-lg hover:bg-gray-50 flex items-center justify-center rounded-r-lg px-1 py-6">
-          <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
-        </button>
-      )}
-
       <div className="w-full h-screen flex flex-col">
-        <Header adminName={adminName} adminId={adminId} />
+        <Header adminName={adminName} adminId={adminId} showMenuButton={true} onMenuClick={() => setSidebarOpen(true)} />
 
         <div className="flex-1 p-4 overflow-hidden">
           <div className="bg-white rounded-lg shadow-lg overflow-hidden h-full flex flex-col">

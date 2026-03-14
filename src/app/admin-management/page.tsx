@@ -195,17 +195,45 @@ export default function AdminManagement() {
                         <td className="px-6 py-4 text-sm text-gray-900 border-r border-gray-200">{admin.joinDate}</td>
                         <td className="px-6 py-4 text-sm text-gray-900">
                           {editingId === admin.id ? (
-                            <div className="flex items-center space-x-3">
-                              <button onClick={saveAdmin} disabled={saving} className="px-3 py-1 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50">{t('common.save')}</button>
-                              <button onClick={cancelEditing} className="px-3 py-1 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">{t('common.cancel')}</button>
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={saveAdmin}
+                                disabled={saving}
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-emerald-200 bg-emerald-50 text-emerald-700 text-xs font-semibold rounded-lg hover:bg-emerald-100 transition-colors disabled:opacity-50"
+                              >
+                                <MaterialIcon name="check" size="small" className="text-emerald-700" />
+                                <span>{saving ? `${t('common.save')}...` : t('common.save')}</span>
+                              </button>
+                              <button
+                                onClick={cancelEditing}
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-gray-300 bg-gray-100 text-gray-700 text-xs font-semibold rounded-lg hover:bg-gray-200 transition-colors"
+                              >
+                                <MaterialIcon name="close" size="small" className="text-gray-700" />
+                                <span>{t('common.cancel')}</span>
+                              </button>
                             </div>
                           ) : (
-                            <div className="flex items-center space-x-3">
-                              <button onClick={() => startEditing(admin)} className="px-3 py-1 bg-blue-500 text-white rounded-lg hover:bg-blue-600 flex items-center space-x-1">
-                                <MaterialIcon name="edit" size="small" className="text-white" /><span>{t('common.edit')}</span>
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={() => startEditing(admin)}
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-sky-200 bg-sky-50 text-sky-700 text-xs font-semibold rounded-lg hover:bg-sky-100 transition-colors"
+                              >
+                                <MaterialIcon name="edit" size="small" className="text-sky-700" />
+                                <span>{t('common.edit')}</span>
                               </button>
-                              <button onClick={() => handleDelete(admin.id)} disabled={deletingId === admin.id} className="px-3 py-1 bg-red-500 text-white rounded-lg hover:bg-red-600 disabled:opacity-50 flex items-center space-x-1">
-                                {deletingId === admin.id ? <span>...</span> : <><MaterialIcon name="delete" size="small" className="text-white" /><span>{t('common.delete')}</span></>}
+                              <button
+                                onClick={() => handleDelete(admin.id)}
+                                disabled={deletingId === admin.id}
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-red-200 bg-red-50 text-red-700 text-xs font-semibold rounded-lg hover:bg-red-100 transition-colors disabled:opacity-50"
+                              >
+                                {deletingId === admin.id ? (
+                                  <span>...</span>
+                                ) : (
+                                  <>
+                                    <MaterialIcon name="delete" size="small" className="text-red-700" />
+                                    <span>{t('common.delete')}</span>
+                                  </>
+                                )}
                               </button>
                             </div>
                           )}
