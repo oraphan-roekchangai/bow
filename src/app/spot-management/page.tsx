@@ -174,7 +174,7 @@ export default function SpotManagement() {
       confirmLabel: status === 'available' ? 'Set All Available' : 'Set All Occupied',
       confirmClassName: status === 'available'
         ? 'px-5 py-2 rounded-lg text-sm font-medium bg-emerald-600 text-white hover:bg-emerald-700 transition-colors'
-        : 'px-5 py-2 rounded-lg text-sm font-medium bg-orange-500 text-white hover:bg-orange-600 transition-colors',
+        : 'px-5 py-2 rounded-lg text-sm font-medium bg-red-600 text-white hover:bg-red-700 transition-colors',
       onConfirm: async () => {
         setModal(null);
         setBulkLoading(prev => new Set(prev).add(lotId));
@@ -265,23 +265,25 @@ export default function SpotManagement() {
         <div className="flex-1 p-4 overflow-auto">
           {/* Summary Cards */}
           <div className="grid grid-cols-4 gap-4 mb-4">
-            <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-200">
-              <div className="text-sm text-gray-500">Total Spots</div>
+            <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-200 flex flex-col justify-between">
+              <div className="text-base text-gray-500">Total Spots</div>
               <div className="text-2xl font-bold text-gray-800">{totalSpots}</div>
             </div>
-            <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-200">
-              <div className="text-sm text-gray-500">Occupied</div>
+            <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-200 flex flex-col justify-between">
+              <div className="text-base text-gray-500">Occupied</div>
               <div className="text-2xl font-bold text-red-600">{totalOccupied}</div>
             </div>
-            <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-200">
-              <div className="text-sm text-gray-500">Available</div>
+            <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-200 flex flex-col justify-between">
+              <div className="text-base text-gray-500">Available</div>
               <div className="text-2xl font-bold text-green-600">{totalAvailable}</div>
             </div>
-            <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-200">
-              <div className="text-sm text-gray-500">Occupancy</div>
-              <div className="text-2xl font-bold text-blue-600">{occupancyPct}%</div>
-              <div className="mt-1 h-2 bg-gray-100 rounded-full overflow-hidden">
-                <div className={`h-full rounded-full transition-all duration-500 ${occupancyPct > 80 ? 'bg-red-500' : occupancyPct > 50 ? 'bg-amber-500' : 'bg-green-500'}`} style={{ width: `${occupancyPct}%` }} />
+            <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-200 flex flex-col justify-between">
+              <div className="text-base text-gray-500">Occupancy</div>
+              <div>
+                <div className="text-2xl font-bold text-blue-600">{occupancyPct}%</div>
+                <div className="mt-1 h-2 bg-gray-100 rounded-full overflow-hidden">
+                  <div className={`h-full rounded-full transition-all duration-500 ${occupancyPct >= 100 ? 'bg-red-500' : occupancyPct >= 60 ? 'bg-amber-500' : 'bg-green-500'}`} style={{ width: `${occupancyPct}%` }} />
+                </div>
               </div>
             </div>
           </div>
@@ -321,7 +323,12 @@ export default function SpotManagement() {
                       >
                         <span>{group.lotName}</span>
                         <span className={`ml-2 text-xs px-2 py-0.5 rounded-full ${
-                          isSelected ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
+                          (() => {
+                            const pct = groupTotal > 0 ? Math.round((groupOccupied / groupTotal) * 100) : 0;
+                            if (pct >= 100) return 'bg-red-100 text-red-700';
+                            if (pct >= 60) return 'bg-amber-100 text-amber-700';
+                            return 'bg-green-100 text-green-700';
+                          })()
                         }`}>
                           {groupOccupied}/{groupTotal}
                         </span>
@@ -380,7 +387,7 @@ export default function SpotManagement() {
                           <div className="mb-4">
                             <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
                               <div
-                                className={`h-full rounded-full transition-all duration-500 ${isVip ? 'bg-amber-500' : 'bg-blue-500'}`}
+                                className={`h-full rounded-full transition-all duration-500 ${(() => { const pct = lot.spots.length > 0 ? Math.round((lot.occupied / lot.spots.length) * 100) : 0; return pct >= 100 ? 'bg-red-500' : pct >= 60 ? 'bg-amber-500' : 'bg-green-500'; })()}`}
                                 style={{ width: `${lot.spots.length > 0 ? (lot.occupied / lot.spots.length) * 100 : 0}%` }}
                               />
                             </div>

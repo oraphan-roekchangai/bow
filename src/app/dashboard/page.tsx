@@ -291,7 +291,7 @@ export default function Dashboard() {
     { href: "/parking-records",  label: t("sidebar.parkingRecords"),   icon: "M9 17h6m-6-4h6m2 8H7a2 2 0 01-2-2V7a2 2 0 012-2h5l5 5v9a2 2 0 01-2 2z" },
     { href: "/user-management",  label: t("sidebar.userManagement"),   icon: "M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" },
     { href: "/admin-management", label: t("sidebar.adminManagement"),  icon: "M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" },
-    { href: '/spot-management',  icon: 'M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z', key: 'sidebar.spotManagement' },  
+    { href: "/spot-management",  label: t("sidebar.spotManagement"), icon: "M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" },  
     { href: "/gate-controlling", label: t("sidebar.gateControlling"),  icon: "M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" },
   ];
 
@@ -369,13 +369,11 @@ export default function Dashboard() {
         <div className="flex-1 p-4 overflow-y-auto">
           {/* Summary */}
           {chartData?.summary && (
-            <div className="bg-white rounded-lg p-3 shadow-sm mb-4">
-              <div className="grid grid-cols-4 gap-3">
-                <div className="bg-gray-50 rounded-lg p-3 border border-gray-200"><div className="text-sm text-gray-800">{t("dashboard.totalRecords")}</div><div className="text-xl font-bold text-gray-600">{chartData.summary.total_records}</div></div>
-                <div className="bg-gray-50 rounded-lg p-3 border border-gray-200"><div className="text-sm text-gray-800">{t("dashboard.currentlyParked")}</div><div className="text-xl font-bold text-green-600">{chartData.summary.currently_parked}</div></div>
-                <div className="bg-gray-50 rounded-lg p-3 border border-gray-200"><div className="text-sm text-gray-800">{t("dashboard.todayEntries")}</div><div className="text-xl font-bold text-blue-600">{chartData.summary.today_entries}</div></div>
-                <div className="bg-gray-50 rounded-lg p-3 border border-gray-200"><div className="text-sm text-gray-800">{t("dashboard.totalRevenue")}</div><div className="text-xl font-bold text-teal-600">฿{Number(chartData.summary.total_revenue).toFixed(2)}</div></div>
-              </div>
+            <div className="grid grid-cols-4 gap-4 mb-4">
+              <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-200 flex flex-col justify-between"><div className="text-sm text-gray-500">{t("dashboard.totalRecords")}</div><div className="text-xl font-bold text-gray-600">{chartData.summary.total_records}</div></div>
+              <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-200 flex flex-col justify-between"><div className="text-sm text-gray-500">{t("dashboard.currentlyParked")}</div><div className="text-xl font-bold text-green-600">{chartData.summary.currently_parked}</div></div>
+              <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-200 flex flex-col justify-between"><div className="text-sm text-gray-500">{t("dashboard.todayEntries")}</div><div className="text-xl font-bold text-blue-600">{chartData.summary.today_entries}</div></div>
+              <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-200 flex flex-col justify-between"><div className="text-sm text-gray-500">{t("dashboard.totalRevenue")}</div><div className="text-xl font-bold text-teal-600">฿{Number(chartData.summary.total_revenue).toFixed(2)}</div></div>
             </div>
           )}
 

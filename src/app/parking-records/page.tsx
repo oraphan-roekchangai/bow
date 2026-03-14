@@ -132,7 +132,7 @@ export default function ParkingRecordsPage() {
   const [loading, setLoading]         = useState(true);
   const [error, setError]             = useState('');
   const [searchTerm, setSearchTerm]   = useState('');
-  const [now, setNow]                 = useState(Date.now());
+  const [refreshTick, setRefreshTick] = useState(0);
   const [actionLoading, setActionLoading] = useState<{[key: string]: boolean}>({});
   const [freeMinInput, setFreeMinInput]   = useState<{[id: number]: string}>({});
   const [modal, setModal] = useState<{ message: string; warning?: string; confirmLabel?: string; confirmClassName?: string; hideCancel?: boolean; onConfirm: () => void } | null>(null);
@@ -156,7 +156,7 @@ export default function ParkingRecordsPage() {
   const router = useRouter();
 
   useEffect(() => {
-    const timer = setInterval(() => setNow(Date.now()), 60000);
+    const timer = setInterval(() => setRefreshTick(t => t + 1), 5000);
     return () => clearInterval(timer);
   }, []);
 
@@ -175,7 +175,7 @@ export default function ParkingRecordsPage() {
   useEffect(() => {
     (async () => {
       try {
-        setLoading(true);
+        if (refreshTick === 0) { setLoading(true); }
         const params = new URLSearchParams({ limit: String(LIMIT), page: String(page) });
         if (debouncedSearch.trim()) params.set('plate', debouncedSearch.trim());
         if (sortCol) {
@@ -196,7 +196,7 @@ export default function ParkingRecordsPage() {
         setLoading(false);
       }
     })();
-  }, [page, debouncedSearch, sortCol, sortDir, memberSortIdx]);
+  }, [page, debouncedSearch, sortCol, sortDir, memberSortIdx, refreshTick]);
 
   useEffect(() => {
     (async () => {
@@ -357,7 +357,7 @@ export default function ParkingRecordsPage() {
 
         <div className="flex-1 p-4 overflow-hidden">
           <div className="bg-white rounded-lg shadow-lg overflow-hidden h-full flex flex-col">
-            <div className="p-3 flex-shrink-0 border-b border-gray-200">
+            <div className="px-5 py-3 flex-shrink-0 border-b border-gray-200">
               <div className="flex items-center justify-between gap-3">
                 <h2 className="text-xl font-bold text-gray-800">Vehicle Parking Records</h2>
                 <div className="flex items-center gap-3">
