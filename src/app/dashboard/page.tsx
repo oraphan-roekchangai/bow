@@ -45,17 +45,22 @@ export default function Dashboard() {
   const [chartType, setChartType]       = useState<"line" | "bar">("line");
   const [selectedRange, setSelectedRange] = useState<ChartRange>("hour");
   const { t } = useLanguage();
+
+  interface FloorData {
+    lotId: number;
+    lotCode: string;
+    lotName: string;
+    lotType: string;
+    totalSpots: number;
+    occupied: number;
+    available: number;
+  }
+
+  const floors: FloorData[] = chartData?.summary?.floors || [];
+
+  const pct = (used: number, total: number) => total > 0 ? (used / total) * 100 : 0;
+
   const router = useRouter();
-
-  const parkingData = {
-    floor1VIP:    { used: 15, total: 20 },
-    floor1Member: { used: 19, total: 20 },
-    floor2:       { used: 5,  total: 40 },
-    floor3:       { used: 10, total: 40 },
-    floor4:       { used: 35, total: 40 },
-  };
-
-  const pct = (used: number, total: number) => (used / total) * 100;
 
   // Load admin session
   useEffect(() => {
@@ -178,37 +183,42 @@ export default function Dashboard() {
     },
   };
 
-  const floor1GroupCapacity = parkingData.floor1VIP.total + parkingData.floor1Member.total;
-  const floor2To4GroupCapacity = parkingData.floor2.total + parkingData.floor3.total + parkingData.floor4.total;
+  const floor1Lots = floors.filter(f => f.lotCode === 'A');
+  const floor2to4Lots = floors.filter(f => ['B', 'C', 'D'].includes(f.lotCode));
 
-  const floor1PieData = useMemo<ChartData<"pie">>(() => ({
-    labels: [t("parking.floor1vip"), t("parking.floor1"), t("parking.available")],
-    datasets: [{
-      data: [
-        parkingData.floor1VIP.used,
-        parkingData.floor1Member.used,
-        Math.max(floor1GroupCapacity - (parkingData.floor1VIP.used + parkingData.floor1Member.used), 0),
-      ],
-      backgroundColor: ["#f59e0b", "#2563eb", "#e5e7eb"],
-      borderColor: ["#ffffff", "#ffffff", "#ffffff"],
-      borderWidth: 2,
-    }],
-  }), [t, floor1GroupCapacity, parkingData.floor1VIP.used, parkingData.floor1Member.used]);
+  const floor1PieData = useMemo<ChartData<"pie">>(() => {
+    const vip = floor1Lots.find(f => f.lotType === 'vip');
+    const reg = floor1Lots.find(f => f.lotType === 'regular');
+    const vipUsed = vip?.occupied || 0;
+    const regUsed = reg?.occupied || 0;
+    const totalCap = floor1Lots.reduce((s, l) => s + l.totalSpots, 0);
+    return {
+      labels: [t("parking.floor1vip"), t("parking.floor1"), t("parking.available")],
+      datasets: [{
+        data: [vipUsed, regUsed, Math.max(totalCap - vipUsed - regUsed, 0)],
+        backgroundColor: ["#f59e0b", "#2563eb", "#e5e7eb"],
+        borderColor: ["#ffffff", "#ffffff", "#ffffff"],
+        borderWidth: 2,
+      }],
+    };
+  }, [t, floor1Lots]);
 
-  const floor2To4PieData = useMemo<ChartData<"pie">>(() => ({
-    labels: [t("parking.floor2"), t("parking.floor3"), t("parking.floor4"), t("parking.available")],
-    datasets: [{
-      data: [
-        parkingData.floor2.used,
-        parkingData.floor3.used,
-        parkingData.floor4.used,
-        Math.max(floor2To4GroupCapacity - (parkingData.floor2.used + parkingData.floor3.used + parkingData.floor4.used), 0),
-      ],
-      backgroundColor: ["#14b8a6", "#8b5cf6", "#ef4444", "#e5e7eb"],
-      borderColor: ["#ffffff", "#ffffff", "#ffffff", "#ffffff"],
-      borderWidth: 2,
-    }],
-  }), [t, floor2To4GroupCapacity, parkingData.floor2.used, parkingData.floor3.used, parkingData.floor4.used]);
+  const floor2To4PieData = useMemo<ChartData<"pie">>(() => {
+    const f2 = floor2to4Lots.find(f => f.lotCode === 'B');
+    const f3 = floor2to4Lots.find(f => f.lotCode === 'C');
+    const f4 = floor2to4Lots.find(f => f.lotCode === 'D');
+    const totalCap = floor2to4Lots.reduce((s, l) => s + l.totalSpots, 0);
+    const totalUsed = floor2to4Lots.reduce((s, l) => s + l.occupied, 0);
+    return {
+      labels: [t("parking.floor2"), t("parking.floor3"), t("parking.floor4"), t("parking.available")],
+      datasets: [{
+        data: [f2?.occupied || 0, f3?.occupied || 0, f4?.occupied || 0, Math.max(totalCap - totalUsed, 0)],
+        backgroundColor: ["#14b8a6", "#8b5cf6", "#ef4444", "#e5e7eb"],
+        borderColor: ["#ffffff", "#ffffff", "#ffffff", "#ffffff"],
+        borderWidth: 2,
+      }],
+    };
+  }, [t, floor2to4Lots]);
 
   const dayLabels   = useMemo(() => chartData?.dayData?.map((i: any) => i.label) ?? Array.from({length:24},(_,h)=>`${h}:00`), [chartData]);
   const dayVals     = useMemo(() => chartData?.dayData?.map((i: any) => i.total_entries) ?? Array(24).fill(0), [chartData]);
@@ -281,6 +291,7 @@ export default function Dashboard() {
     { href: "/parking-records",  label: t("sidebar.parkingRecords"),   icon: "M9 17h6m-6-4h6m2 8H7a2 2 0 01-2-2V7a2 2 0 012-2h5l5 5v9a2 2 0 01-2 2z" },
     { href: "/user-management",  label: t("sidebar.userManagement"),   icon: "M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" },
     { href: "/admin-management", label: t("sidebar.adminManagement"),  icon: "M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" },
+    { href: '/spot-management',  icon: 'M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z', key: 'sidebar.spotManagement' },  
     { href: "/gate-controlling", label: t("sidebar.gateControlling"),  icon: "M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" },
   ];
 
@@ -371,26 +382,30 @@ export default function Dashboard() {
           {/* Floor status cards */}
           <div className="bg-white rounded-lg p-4 shadow-sm mb-4">
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
-              {[
-                { label: t("parking.floor1vip"),  data: parkingData.floor1VIP,    dotColor: "bg-amber-500",  barColor: "bg-amber-500" },
-                { label: t("parking.floor1"),     data: parkingData.floor1Member, dotColor: "bg-blue-600",   barColor: "bg-blue-600" },
-                { label: t("parking.floor2"),     data: parkingData.floor2,       dotColor: "bg-teal-500",   barColor: "bg-teal-500" },
-                { label: t("parking.floor3"),     data: parkingData.floor3,       dotColor: "bg-violet-500", barColor: "bg-violet-500" },
-                { label: t("parking.floor4"),     data: parkingData.floor4,       dotColor: "bg-red-500",    barColor: "bg-red-500" },
-              ].map((f) => (
-                <div key={f.label} className="bg-white rounded-lg p-4 border border-gray-200 shadow-sm">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <div className={`w-2.5 h-2.5 rounded-full ${f.dotColor}`} />
-                      <h3 className="text-base font-bold text-gray-800">{f.label}</h3>
+              {floors.length > 0 ? floors.map((f) => {
+                const dotColor = f.lotType === 'vip' ? 'bg-amber-500'
+                  : f.lotCode === 'A' ? 'bg-blue-600'
+                  : f.lotCode === 'B' ? 'bg-teal-500'
+                  : f.lotCode === 'C' ? 'bg-violet-500'
+                  : 'bg-red-500';
+                const label = f.lotType === 'vip' ? `${f.lotName} (VIP)` : f.lotName;
+                return (
+                  <div key={f.lotId} className="bg-white rounded-lg p-4 border border-gray-200 shadow-sm">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <div className={`w-2.5 h-2.5 rounded-full ${dotColor}`} />
+                        <h3 className="text-base font-bold text-gray-800">{label}</h3>
+                      </div>
+                      <p className="text-base font-bold text-gray-700">{f.occupied}/{f.totalSpots}</p>
                     </div>
-                    <p className="text-base font-bold text-gray-700">{f.data.used}/{f.data.total}</p>
+                    <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                      <div className={`h-full ${dotColor} rounded-full transition-all duration-500`} style={{ width: `${pct(f.occupied, f.totalSpots)}%` }} />
+                    </div>
                   </div>
-                  <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-                    <div className={`h-full ${f.barColor} rounded-full transition-all duration-500`} style={{ width: `${pct(f.data.used, f.data.total)}%` }} />
-                  </div>
-                </div>
-              ))}
+                );
+              }) : (
+                <div className="col-span-full text-center text-gray-400 text-sm py-4">No floor data available</div>
+              )}
             </div>
           </div>
 
