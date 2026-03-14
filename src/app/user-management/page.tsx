@@ -45,11 +45,11 @@ export default function UserManagement() {
     (async () => {
       try {
         const res = await fetch('/api/admin/auth/me', { credentials: 'include', cache: 'no-store' });
-        if (!res.ok) { router.replace('/login'); return; }
+        if (!res.ok) { router.replace('/pop'); return; }
         const { admin = {} } = await res.json();
         setAdminName(admin.fullName || admin.username || 'Admin');
         setAdminId(admin.admin_id || admin.id || null);
-      } catch { router.replace('/login'); }
+      } catch { router.replace('/pop'); }
     })();
   }, [router]);
 
@@ -152,7 +152,7 @@ export default function UserManagement() {
   const resolvedError = error === 'FETCH_ERROR' ? (t('user.error') || 'Error loading users') : error;
 
   return (
-    <div className="h-screen bg-gray-50 overflow-hidden">
+    <div className="h-screen bg-green-50 overflow-hidden">
       {/* Sidebar */}
       <div className={`fixed left-0 top-0 h-full w-64 bg-white shadow-lg transform transition-transform duration-300 z-40 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         <div className="p-6">
@@ -173,18 +173,35 @@ export default function UserManagement() {
         </div>
       </div>
 
+      {!sidebarOpen && (
+        <button aria-label="Open sidebar" onClick={() => setSidebarOpen(true)} className="fixed left-0 top-1/2 -translate-y-1/2 z-50 bg-white border border-gray-300 shadow-lg hover:bg-gray-50 flex items-center justify-center rounded-r-lg px-1 py-6">
+          <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+        </button>
+      )}
+
       <div className="w-full h-screen flex flex-col">
-        <Header adminName={adminName} adminId={adminId} showMenuButton={true} onMenuClick={() => setSidebarOpen(true)} />
+        <Header adminName={adminName} adminId={adminId} />
 
         <div className="flex-1 p-4 overflow-hidden">
           <div className="bg-white rounded-lg shadow-lg overflow-hidden h-full flex flex-col">
             <div className="p-3 flex-shrink-0">
               <div className="flex items-center justify-between gap-3">
                 <h2 className="text-xl font-bold text-gray-800">{t('user.title')}</h2>
-                <div className="relative w-full max-w-lg">
-                  <span className="absolute inset-y-0 left-3 flex items-center"><MaterialIcon name="search" size="small" className="text-gray-400" /></span>
-                  <input type="text" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder={t('common.search') || 'Search'}
-                    className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-xl text-sm bg-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-green-500" />
+                <div className="flex items-center gap-3">
+                  {searchTerm.trim() && (
+                    <span className={`text-sm font-medium whitespace-nowrap ${filteredUsers.length > 0 ? 'text-green-600' : 'text-red-500'}`}>
+                      {filteredUsers.length > 0 ? `${filteredUsers.length} result${filteredUsers.length === 1 ? '' : 's'} found` : 'No users found'}
+                    </span>
+                  )}
+                  <div className="relative w-full max-w-lg">
+                    <span className="absolute inset-y-0 left-3 flex items-center"><MaterialIcon name="search" size="small" className="text-gray-400" /></span>
+                    <input type="text" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder={t('common.search') || 'Search'}
+                      className={`w-full pl-10 pr-3 py-2 border rounded-xl text-sm bg-white placeholder-gray-500 focus:outline-none focus:ring-1 ${
+                        !searchTerm.trim() ? 'border-gray-300 focus:ring-blue-500 focus:border-blue-500'
+                        : filteredUsers.length > 0 ? 'border-green-400 ring-1 ring-green-400'
+                        : 'border-red-400 ring-1 ring-red-400'
+                      }`} />
+                  </div>
                 </div>
               </div>
             </div>

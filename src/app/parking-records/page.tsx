@@ -1,11 +1,61 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Header from '@/components/Header';
 import MaterialIcon from '@/components/MaterialIcon';
 import { useLanguage } from '@/contexts/LanguageContext';
+
+// ── Confirmation Modal ────────────────────────────────────────────────────────
+interface ConfirmModalProps {
+  message: string;
+  warning?: string;
+  confirmLabel?: string;
+  confirmClassName?: string;
+  hideCancel?: boolean;
+  onConfirm: () => void;
+  onCancel: () => void;
+}
+
+function ConfirmModal({ message, warning, confirmLabel = 'OK', confirmClassName, hideCancel, onConfirm, onCancel }: ConfirmModalProps) {
+  const cancelRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => { cancelRef.current?.focus(); }, []);
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      {/* Backdrop */}
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onCancel} />
+      {/* Modal */}
+      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 overflow-hidden">
+        {/* Header */}
+        <div className="px-8 pt-7 pb-2 flex items-center justify-between">
+          <h2 className="text-gray-900 font-bold text-lg">Dashboard</h2>
+          <img src="/admin/prologic-logo.png" alt="ProLogic" className="h-8 object-contain" />
+        </div>
+        {/* Divider with 5px gap from each side */}
+        <div className="mx-[15px] border-t border-gray-200" />
+        {/* Body */}
+        <div className="px-8 pt-4 pb-7 space-y-2">
+          <p className="text-gray-700 text-base leading-relaxed">{message}</p>
+          {warning && <p className="text-red-600 text-base font-semibold">{warning}</p>}
+        </div>
+        {/* Actions */}
+        <div className="px-8 pb-7 flex justify-end gap-3">
+          {!hideCancel && (
+            <button ref={cancelRef} onClick={onCancel}
+              className="px-7 py-2.5 rounded-lg text-sm font-medium border border-gray-300 text-gray-700 hover:bg-gray-50 transition-colors">
+              Cancel
+            </button>
+          )}
+          <button onClick={onConfirm}
+            className={confirmClassName || 'px-7 py-2.5 rounded-lg text-sm font-medium bg-green-600 text-white hover:bg-green-700 transition-colors'}>
+            {confirmLabel}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 interface ParkingRecord {
   id: number;
@@ -84,12 +134,23 @@ export default function ParkingRecordsPage() {
   const [now, setNow]                 = useState(Date.now());
   const [actionLoading, setActionLoading] = useState<{[key: string]: boolean}>({});
   const [freeMinInput, setFreeMinInput]   = useState<{[id: number]: string}>({});
+  const [modal, setModal] = useState<{ message: string; warning?: string; confirmLabel?: string; confirmClassName?: string; hideCancel?: boolean; onConfirm: () => void } | null>(null);
   const [sortCol, setSortCol]             = useState<SortCol | null>(null);
   const [sortDir, setSortDir]             = useState<SortDir>('desc');
   const [memberSortIdx, setMemberSortIdx] = useState(0);
   const [page, setPage]                   = useState(1);
   const [totalRecords, setTotalRecords]   = useState(0);
-  const LIMIT = 50; // 0=non-member first, 1=regular first, 2=vip first
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const LIMIT = 50;
+
+  // Debounce search — wait 400ms after user stops typing before fetching
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(searchTerm), 400);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  // Reset to page 1 when search changes
+  useEffect(() => { setPage(1); }, [debouncedSearch]); // 0=non-member first, 1=regular first, 2=vip first
   const { t } = useLanguage();
   const router = useRouter();
 
@@ -114,7 +175,9 @@ export default function ParkingRecordsPage() {
     (async () => {
       try {
         setLoading(true);
-        const res  = await fetch(`/api/admin/parking?limit=${LIMIT}&page=${page}`, { credentials: 'include', cache: 'no-store' });
+        const params = new URLSearchParams({ limit: String(LIMIT), page: String(page) });
+        if (debouncedSearch.trim()) params.set('plate', debouncedSearch.trim());
+        const res  = await fetch(`/api/admin/parking?${params}`, { credentials: 'include', cache: 'no-store' });
         const body = await res.json();
         if (!res.ok || !body.success) throw new Error(body.error || 'Failed to fetch parking records');
         setRecords(body.data || []);
@@ -127,7 +190,7 @@ export default function ParkingRecordsPage() {
         setLoading(false);
       }
     })();
-  }, [page]);
+  }, [page, debouncedSearch]);
 
   useEffect(() => {
     (async () => {
@@ -139,30 +202,26 @@ export default function ParkingRecordsPage() {
     })();
   }, []);
 
-  const filteredRecords = useMemo(() => {
-    const term = searchTerm.trim().toLowerCase();
-    if (!term) return records;
-    return records.filter((r) =>
-      [r.detected_plate, r.exit_time ? 'exited' : 'parked', r.entry_time, r.exit_time || '',
-       r.payment_status, r.member_status]
-        .join(' ').toLowerCase().includes(term)
-    );
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [records, searchTerm, now]);
-
-  // Reset to page 1 when search changes
-  useEffect(() => { setPage(1); }, [searchTerm]);
-
   const handleSort = (col: SortCol) => {
     if (col === 'member') {
-      setSortCol('member');
-      setMemberSortIdx(prev => (prev + 1) % 3);
+      // cycle: null → idx0 → idx1 → idx2 → null
+      if (sortCol !== 'member') {
+        setSortCol('member');
+        setMemberSortIdx(0);
+      } else {
+        const next = (memberSortIdx + 1) % 4;
+        if (next === 3) { setSortCol(null); setMemberSortIdx(0); }
+        else setMemberSortIdx(next);
+      }
       return;
     }
-    if (sortCol === col) {
-      setSortDir(prev => prev === 'desc' ? 'asc' : 'desc');
-    } else {
+    if (sortCol !== col) {
       setSortCol(col);
+      setSortDir('desc');
+    } else if (sortDir === 'desc') {
+      setSortDir('asc');
+    } else {
+      setSortCol(null);
       setSortDir('desc');
     }
   };
@@ -171,12 +230,12 @@ export default function ParkingRecordsPage() {
   const paymentOrder: Record<string, number> = { 'UNPAID': 0, 'PENDING': 1, 'PAID': 2 };
 
   const sortedRecords = useMemo(() => {
-    if (!sortCol) return filteredRecords;
-    return [...filteredRecords].sort((a, b) => {
+    if (!sortCol) return records;
+    return [...records].sort((a, b) => {
       let cmp = 0;
       switch (sortCol) {
         case 'plate':
-          cmp = (a.detected_plate || '').localeCompare(b.detected_plate || '', 'th');
+          cmp = (b.detected_plate || '').localeCompare(a.detected_plate || '', 'th');
           break;
         case 'member': {
           const ai = ((memberOrder[a.member_status] ?? 0) - memberSortIdx + 3) % 3;
@@ -220,9 +279,8 @@ export default function ParkingRecordsPage() {
       return sortDir === 'desc' ? -cmp : cmp;
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filteredRecords, sortCol, sortDir, memberSortIdx, rates]);
+  }, [records, sortCol, sortDir, memberSortIdx, rates]);
 
-  // Sort indicator helper
   const sortIcon = (col: SortCol) => {
     if (sortCol !== col) return <span className="text-gray-300 group-hover:text-gray-400">↕</span>;
     if (col === 'member') {
@@ -236,53 +294,85 @@ export default function ParkingRecordsPage() {
     setActionLoading(prev => ({ ...prev, [key]: val }));
 
   const handleForceExit = async (id: number) => {
-    if (!confirm('Force this car to exit now?')) return;
-    setActionState(`exit-${id}`, true);
-    try {
-      const res  = await fetch('/api/admin/parking/force-exit', { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ id }) });
-      const data = await res.json();
-      if (!res.ok || !data.success) throw new Error(data.error || 'Failed');
-      setRecords(prev => prev.map(r => r.id === id ? { ...r, exit_time: new Date().toISOString() } : r));
-    } catch (err) { alert((err as Error).message); }
-    finally { setActionState(`exit-${id}`, false); }
+    setModal({
+      message: 'Force this car to exit now?',
+      warning: '*** This cannot be undone. ***',
+      confirmLabel: 'Force Exit',
+      confirmClassName: 'px-5 py-2 rounded-lg text-sm font-medium bg-orange-500 text-white hover:bg-orange-600 transition-colors',
+      onConfirm: async () => {
+        setModal(null);
+        setActionState(`exit-${id}`, true);
+        try {
+          const res  = await fetch('/api/admin/parking/force-exit', { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ id }) });
+          const data = await res.json();
+          if (!res.ok || !data.success) throw new Error(data.error || 'Failed');
+          setRecords(prev => prev.map(r => r.id === id ? { ...r, exit_time: new Date().toISOString() } : r));
+        } catch (err) { alert((err as Error).message); }
+        finally { setActionState(`exit-${id}`, false); }
+      },
+    });
   };
 
   const handleAddFreeMinutes = async (id: number) => {
     const mins = parseInt(freeMinInput[id] || '');
-    if (isNaN(mins) || mins <= 0) { alert('Enter a valid number of minutes'); return; }
-    if (!confirm(`Add ${mins} free minutes to this record?`)) return;
-    setActionState(`free-${id}`, true);
-    try {
-      const res  = await fetch('/api/admin/parking/free-minutes', { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ id, minutes: mins }) });
-      const data = await res.json();
-      if (!res.ok || !data.success) throw new Error(data.error || 'Failed');
-      setRecords(prev => prev.map(r => r.id === id ? { ...r, extra_free_minutes: data.extra_free_minutes } : r));
-      setFreeMinInput(prev => ({ ...prev, [id]: '' }));
-    } catch (err) { alert((err as Error).message); }
-    finally { setActionState(`free-${id}`, false); }
+    if (isNaN(mins) || mins <= 0) {
+      setModal({
+        message: 'Enter a valid number of minutes.',
+        confirmLabel: 'OK',
+        confirmClassName: 'px-7 py-2.5 rounded-lg text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 transition-colors',
+        hideCancel: true,
+        onConfirm: () => setModal(null),
+      });
+      return;
+    }
+    setModal({
+      message: `Add ${mins} free minute${mins === 1 ? '' : 's'} to this record?`,
+      confirmLabel: 'Add Minutes',
+      confirmClassName: 'px-5 py-2 rounded-lg text-sm font-medium bg-emerald-600 text-white hover:bg-emerald-700 transition-colors',
+      onConfirm: async () => {
+        setModal(null);
+        setActionState(`free-${id}`, true);
+        try {
+          const res  = await fetch('/api/admin/parking/free-minutes', { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ id, minutes: mins }) });
+          const data = await res.json();
+          if (!res.ok || !data.success) throw new Error(data.error || 'Failed');
+          setRecords(prev => prev.map(r => r.id === id ? { ...r, extra_free_minutes: data.extra_free_minutes } : r));
+          setFreeMinInput(prev => ({ ...prev, [id]: '' }));
+        } catch (err) { alert((err as Error).message); }
+        finally { setActionState(`free-${id}`, false); }
+      },
+    });
   };
 
   const handleDelete = async (id: number) => {
-    if (!confirm('Permanently delete this parking record? This cannot be undone.')) return;
-    setActionState(`del-${id}`, true);
-    try {
-      const res  = await fetch('/api/admin/parking', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ id }) });
-      const data = await res.json();
-      if (!res.ok || !data.success) throw new Error(data.error || 'Failed');
-      setRecords(prev => prev.filter(r => r.id !== id));
-    } catch (err) { alert((err as Error).message); }
-    finally { setActionState(`del-${id}`, false); }
+    setModal({
+      message: 'Permanently delete this parking record?',
+      warning: '*** This cannot be undone. ***',
+      confirmLabel: 'Delete',
+      confirmClassName: 'px-5 py-2 rounded-lg text-sm font-medium bg-red-600 text-white hover:bg-red-700 transition-colors',
+      onConfirm: async () => {
+        setModal(null);
+        setActionState(`del-${id}`, true);
+        try {
+          const res  = await fetch('/api/admin/parking', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ id }) });
+          const data = await res.json();
+          if (!res.ok || !data.success) throw new Error(data.error || 'Failed');
+          setRecords(prev => prev.filter(r => r.id !== id));
+        } catch (err) { alert((err as Error).message); }
+        finally { setActionState(`del-${id}`, false); }
+      },
+    });
   };
 
   const columns: { label: string; col: SortCol | null }[] = [
-    { label: 'License plate',    col: 'plate'    },
+    { label: 'License Plate',    col: 'plate'    },
     { label: 'Member Status',    col: 'member'   },
     { label: 'Parking Status',   col: 'parking'  },
     { label: 'Payment Status',   col: 'payment'  },
     { label: 'Entry Time',       col: 'entry'    },
     { label: 'Exit Time',        col: 'exit'     },
     { label: 'Parking Duration', col: 'duration' },
-    { label: 'Total parking fee',col: 'fee'      },
+    { label: 'Total Parking Fee',col: 'fee'      },
     { label: 'Actions',          col: null       },
   ];
 
@@ -316,10 +406,21 @@ export default function ParkingRecordsPage() {
             <div className="p-3 flex-shrink-0 border-b border-gray-200">
               <div className="flex items-center justify-between gap-3">
                 <h2 className="text-xl font-bold text-gray-800">Vehicle Parking Records</h2>
-                <div className="relative w-full max-w-lg">
-                  <span className="absolute inset-y-0 left-3 flex items-center"><MaterialIcon name="search" size="small" className="text-gray-400" /></span>
-                  <input type="text" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder={t('common.search') || 'Search'}
-                    className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-xl text-sm text-gray-900 caret-gray-900 bg-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-green-500" />
+                <div className="flex items-center gap-3">
+                  {searchTerm.trim() && (
+                    <span className={`text-sm font-medium whitespace-nowrap ${totalRecords > 0 ? 'text-green-600' : 'text-red-500'}`}>
+                      {totalRecords > 0 ? `${totalRecords.toLocaleString()} result${totalRecords === 1 ? '' : 's'} found` : 'No records found'}
+                    </span>
+                  )}
+                  <div className="relative w-full max-w-lg">
+                    <span className="absolute inset-y-0 left-3 flex items-center"><MaterialIcon name="search" size="small" className="text-gray-400" /></span>
+                    <input type="text" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder="License plate search"
+                      className={`w-full pl-10 pr-3 py-2 border rounded-xl text-sm text-gray-900 caret-gray-900 bg-white placeholder-gray-500 focus:outline-none focus:ring-1 ${
+                        !searchTerm.trim() ? 'border-gray-300 focus:ring-blue-500 focus:border-blue-500'
+                        : totalRecords > 0  ? 'border-green-400 ring-1 ring-green-400'
+                        : 'border-red-400 ring-1 ring-red-400'
+                      }`} />
+                  </div>
                 </div>
               </div>
             </div>
@@ -443,7 +544,9 @@ export default function ParkingRecordsPage() {
                         </tr>
                       );
                     }) : (
-                      <tr><td colSpan={9} className="px-6 py-8 text-sm text-center text-gray-500">{t('table.noRecords')}</td></tr>
+                      <tr><td colSpan={9} className="px-6 py-8 text-sm text-center text-gray-500">
+                        {searchTerm.trim() ? `No parking records found for "${searchTerm.trim()}"` : t('table.noRecords')}
+                      </td></tr>
                     )}
                   </tbody>
                 </table>
@@ -456,7 +559,7 @@ export default function ParkingRecordsPage() {
                 {rates && <>Estimated fee updates every minute — Rate: ฿{rates.rate_per_hour}/hr · Min fee: ฿{rates.minimum_fee} · Free: 60 min (120 min for members)</>}
               </div>
               <div className="flex items-center gap-3 text-sm text-gray-600">
-                <span>{((page - 1) * LIMIT) + 1}–{Math.min(page * LIMIT, totalRecords)} of {totalRecords.toLocaleString()}</span>
+                <span>{((page - 1) * LIMIT) + 1} – {Math.min(page * LIMIT, totalRecords)} of {totalRecords.toLocaleString()}</span>
                 <div className="flex items-center gap-1">
                   <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
                     className="p-1 rounded hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors">
@@ -472,6 +575,19 @@ export default function ParkingRecordsPage() {
           </div>
         </div>
       </div>
+
+      {/* Confirmation Modal */}
+      {modal && (
+        <ConfirmModal
+          message={modal.message}
+          warning={modal.warning}
+          confirmLabel={modal.confirmLabel}
+          confirmClassName={modal.confirmClassName}
+          hideCancel={modal.hideCancel}
+          onConfirm={modal.onConfirm}
+          onCancel={() => setModal(null)}
+        />
+      )}
     </div>
   );
 }
