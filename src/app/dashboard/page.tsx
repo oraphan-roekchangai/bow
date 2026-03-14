@@ -18,11 +18,6 @@ const Line = nextDynamic(() => import("react-chartjs-2").then(m => ({ default: m
 const Bar  = nextDynamic(() => import("react-chartjs-2").then(m => ({ default: m.Bar })),  { ssr: false });
 const Pie  = nextDynamic(() => import("react-chartjs-2").then(m => ({ default: m.Pie })),  { ssr: false });
 
-ChartJS.register(
-  CategoryScale, LinearScale, PointElement, LineElement,
-  BarElement, ArcElement, Title, Tooltip, Legend, Filler
-);
-
 interface ParkingRecord {
   id: number;
   detected_plate: string;
@@ -59,7 +54,10 @@ export default function Dashboard() {
 
   useEffect(() => {
     import("chartjs-plugin-zoom").then((mod) => {
-      ChartJS.register(mod.default);
+      ChartJS.register(
+        CategoryScale, LinearScale, PointElement, LineElement,
+        BarElement, ArcElement, Title, Tooltip, Legend, Filler
+      );
     });
   }, []);
 
