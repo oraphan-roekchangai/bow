@@ -44,6 +44,7 @@ const translations: Record<Language, Record<string, string>> = {
     'parking.floor2': '2nd Floor',
     'parking.floor3': '3rd Floor',
     'parking.floor4': '4th Floor',
+    'parking.available': 'Available',
     
     // Table
     'table.time': 'Time',
@@ -171,6 +172,7 @@ const translations: Record<Language, Record<string, string>> = {
     'parking.floor2': 'ชั้น 2',
     'parking.floor3': 'ชั้น 3',
     'parking.floor4': 'ชั้น 4',
+    'parking.available': 'ช่องว่าง',
     
     // Table
     'table.time': 'เวลา',

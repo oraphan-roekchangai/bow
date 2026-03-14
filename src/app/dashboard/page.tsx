@@ -12,10 +12,11 @@ import {
   ChartOptions, ChartData,
 } from "chart.js";
 import { Line, Bar, Pie } from "react-chartjs-2";
+import zoomPlugin from "chartjs-plugin-zoom";
 
 ChartJS.register(
   CategoryScale, LinearScale, PointElement, LineElement,
-  BarElement, ArcElement, Title, Tooltip, Legend, Filler
+  BarElement, ArcElement, Title, Tooltip, Legend, Filler, zoomPlugin
 );
 
 interface ParkingRecord {
@@ -114,6 +115,14 @@ export default function Dashboard() {
     plugins: {
       legend: { display: false },
       tooltip: { intersect: false, mode: "index", backgroundColor: "#111827", titleColor: "#fff", bodyColor: "#e5e7eb", padding: 10 },
+      zoom: {
+        pan: { enabled: true, mode: "x" },
+        zoom: {
+          wheel: { enabled: true },
+          pinch: { enabled: true },
+          mode: "x",
+        },
+      },
     },
     scales: {
       x: { grid: { color: "#e5e7eb" }, ticks: { color: "#9ca3af", maxRotation: 0, autoSkip: true, maxTicksLimit: 12 } },
@@ -129,7 +138,18 @@ export default function Dashboard() {
 
   const createBarOptions = (color: string, values: number[]): ChartOptions<"bar"> => ({
     responsive: true, maintainAspectRatio: false,
-    plugins: { legend: { display: false }, tooltip: { intersect: false, mode: "index", backgroundColor: "#111827", titleColor: "#fff", bodyColor: "#e5e7eb", padding: 10 } },
+    plugins: {
+      legend: { display: false },
+      tooltip: { intersect: false, mode: "index", backgroundColor: "#111827", titleColor: "#fff", bodyColor: "#e5e7eb", padding: 10 },
+      zoom: {
+        pan: { enabled: true, mode: "x" },
+        zoom: {
+          wheel: { enabled: true },
+          pinch: { enabled: true },
+          mode: "x",
+        },
+      },
+    },
     scales: {
       x: { grid: { color: "#e5e7eb" }, ticks: { color: "#9ca3af", maxRotation: 0, autoSkip: true, maxTicksLimit: 12 } },
       y: {
@@ -170,25 +190,37 @@ export default function Dashboard() {
     },
   };
 
-  const floor1PieData = useMemo<ChartData<"pie">>(() => ({
-    labels: [t("parking.floor1vip"), t("parking.floor1")],
-    datasets: [{
-      data: [parkingData.floor1VIP.used, parkingData.floor1Member.used],
-      backgroundColor: ["#f59e0b", "#2563eb"],
-      borderColor: ["#ffffff", "#ffffff"],
-      borderWidth: 2,
-    }],
-  }), [t, parkingData.floor1VIP.used, parkingData.floor1Member.used]);
+  const floor1GroupCapacity = parkingData.floor1VIP.total + parkingData.floor1Member.total;
+  const floor2To4GroupCapacity = parkingData.floor2.total + parkingData.floor3.total + parkingData.floor4.total;
 
-  const floor2To4PieData = useMemo<ChartData<"pie">>(() => ({
-    labels: [t("parking.floor2"), t("parking.floor3"), t("parking.floor4")],
+  const floor1PieData = useMemo<ChartData<"pie">>(() => ({
+    labels: [t("parking.floor1vip"), t("parking.floor1"), t("parking.available")],
     datasets: [{
-      data: [parkingData.floor2.used, parkingData.floor3.used, parkingData.floor4.used],
-      backgroundColor: ["#14b8a6", "#8b5cf6", "#ef4444"],
+      data: [
+        parkingData.floor1VIP.used,
+        parkingData.floor1Member.used,
+        Math.max(floor1GroupCapacity - (parkingData.floor1VIP.used + parkingData.floor1Member.used), 0),
+      ],
+      backgroundColor: ["#f59e0b", "#2563eb", "#e5e7eb"],
       borderColor: ["#ffffff", "#ffffff", "#ffffff"],
       borderWidth: 2,
     }],
-  }), [t, parkingData.floor2.used, parkingData.floor3.used, parkingData.floor4.used]);
+  }), [t, floor1GroupCapacity, parkingData.floor1VIP.used, parkingData.floor1Member.used]);
+
+  const floor2To4PieData = useMemo<ChartData<"pie">>(() => ({
+    labels: [t("parking.floor2"), t("parking.floor3"), t("parking.floor4"), t("parking.available")],
+    datasets: [{
+      data: [
+        parkingData.floor2.used,
+        parkingData.floor3.used,
+        parkingData.floor4.used,
+        Math.max(floor2To4GroupCapacity - (parkingData.floor2.used + parkingData.floor3.used + parkingData.floor4.used), 0),
+      ],
+      backgroundColor: ["#14b8a6", "#8b5cf6", "#ef4444", "#e5e7eb"],
+      borderColor: ["#ffffff", "#ffffff", "#ffffff", "#ffffff"],
+      borderWidth: 2,
+    }],
+  }), [t, floor2To4GroupCapacity, parkingData.floor2.used, parkingData.floor3.used, parkingData.floor4.used]);
 
   const dayLabels   = useMemo(() => chartData?.dayData?.map((i: any) => i.label) ?? Array.from({length:24},(_,h)=>`${h}:00`), [chartData]);
   const dayVals     = useMemo(() => chartData?.dayData?.map((i: any) => i.total_entries) ?? Array(24).fill(0), [chartData]);
@@ -352,11 +384,11 @@ export default function Dashboard() {
           <div className="bg-white rounded-lg p-4 shadow-sm mb-4">
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
               {[
-                { label: t("parking.floor1vip"),  data: parkingData.floor1VIP,    dotColor: "bg-yellow-400", barColor: "bg-yellow-400" },
-                { label: t("parking.floor1"),     data: parkingData.floor1Member, dotColor: "bg-blue-500",   barColor: "bg-green-500" },
-                { label: t("parking.floor2"),     data: parkingData.floor2,       dotColor: "bg-blue-500",   barColor: "bg-green-500" },
-                { label: t("parking.floor3"),     data: parkingData.floor3,       dotColor: "bg-blue-500",   barColor: "bg-green-500" },
-                { label: t("parking.floor4"),     data: parkingData.floor4,       dotColor: "bg-blue-500",   barColor: "bg-green-500" },
+                { label: t("parking.floor1vip"),  data: parkingData.floor1VIP,    dotColor: "bg-amber-500",  barColor: "bg-amber-500" },
+                { label: t("parking.floor1"),     data: parkingData.floor1Member, dotColor: "bg-blue-600",   barColor: "bg-blue-600" },
+                { label: t("parking.floor2"),     data: parkingData.floor2,       dotColor: "bg-teal-500",   barColor: "bg-teal-500" },
+                { label: t("parking.floor3"),     data: parkingData.floor3,       dotColor: "bg-violet-500", barColor: "bg-violet-500" },
+                { label: t("parking.floor4"),     data: parkingData.floor4,       dotColor: "bg-red-500",    barColor: "bg-red-500" },
               ].map((f) => (
                 <div key={f.label} className="bg-white rounded-lg p-4 border border-gray-200 shadow-sm">
                   <div className="flex items-center justify-between mb-2">
@@ -426,6 +458,7 @@ export default function Dashboard() {
                   {[
                     { label: t("parking.floor1vip"), color: "bg-amber-500" },
                     { label: t("parking.floor1"), color: "bg-blue-600" },
+                    { label: t("parking.available"), color: "bg-gray-200" },
                   ].map((item) => (
                     <div key={item.label} className="flex items-center gap-2">
                       <span className={`inline-block w-4 h-4 rounded-sm ${item.color}`} />
@@ -447,6 +480,7 @@ export default function Dashboard() {
                     { label: t("parking.floor2"), color: "bg-teal-500" },
                     { label: t("parking.floor3"), color: "bg-violet-500" },
                     { label: t("parking.floor4"), color: "bg-red-500" },
+                    { label: t("parking.available"), color: "bg-gray-200" },
                   ].map((item) => (
                     <div key={item.label} className="flex items-center gap-2">
                       <span className={`inline-block w-4 h-4 rounded-sm ${item.color}`} />
