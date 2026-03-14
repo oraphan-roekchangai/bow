@@ -286,8 +286,8 @@ export default function ParkingRecordsPage() {
                           <td className="px-6 py-4 text-sm text-gray-900 font-medium border-r border-gray-200">{displayFee}</td>
                           <td className="px-4 py-3 text-sm text-gray-900">
                             <div className="flex flex-col gap-2 min-w-[160px]">
-                              {/* Open parking page */}
-                              {record.public_url && (
+                              {/* Open parking page — only for parked cars */}
+                              {!isExited && record.public_url && (
                                 <a href={record.public_url} target="_blank" rel="noopener noreferrer"
                                   className="inline-flex items-center justify-center gap-1 px-3 py-1.5 bg-blue-500 text-white text-xs font-medium rounded-lg hover:bg-blue-600 transition-colors">
                                   <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
