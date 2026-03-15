@@ -2,6 +2,7 @@
 
 import { useRef, useState, useEffect } from 'react';
 import { useLanguage } from '@/contexts/LanguageContext';
+import DatePicker from '@/components/DatePicker';
 
 // ── Confirmation Modal ────────────────────────────────────────────────────────
 interface ModalState {
@@ -235,11 +236,7 @@ export default function Header({
                 </button>
               )}
               {showDatePicker && currentDate && onDateChange && (
-                <div className="flex items-center space-x-3">
-                  <label htmlFor="header-date-picker" className="text-sm font-medium text-gray-700">{t('header.selectDate')}:</label>
-                  <input id="header-date-picker" type="date" value={currentDate} onChange={(e) => onDateChange(e.target.value)}
-                    className="px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm font-medium text-gray-700" />
-                </div>
+                <DatePicker value={currentDate} onChange={onDateChange} label={`${t('header.selectDate')}:`} />
               )}
             </div>
           </div>

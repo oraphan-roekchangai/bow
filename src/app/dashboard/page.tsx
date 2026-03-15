@@ -200,7 +200,7 @@ export default function Dashboard() {
         data: [vipUsed, regUsed, Math.max(totalCap - vipUsed - regUsed, 0)],
         backgroundColor: ["#f59e0b", "#2563eb", "#e5e7eb"],
         borderColor: ["#ffffff", "#ffffff", "#ffffff"],
-        borderWidth: 2,
+        borderWidth: 0,
       }],
     };
   }, [t, floor1Lots]);
@@ -217,7 +217,7 @@ export default function Dashboard() {
         data: [f2?.occupied || 0, f3?.occupied || 0, f4?.occupied || 0, Math.max(totalCap - totalUsed, 0)],
         backgroundColor: ["#14b8a6", "#8b5cf6", "#ef4444", "#e5e7eb"],
         borderColor: ["#ffffff", "#ffffff", "#ffffff", "#ffffff"],
-        borderWidth: 2,
+        borderWidth: 0,
       }],
     };
   }, [t, floor2to4Lots]);

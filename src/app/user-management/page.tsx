@@ -74,7 +74,7 @@ export default function UserManagement() {
   const [deletingId, setDeletingId]   = useState<number | null>(null);
   const [saving, setSaving]           = useState(false);
   const [searchTerm, setSearchTerm]   = useState('');
-  const [editForm, setEditForm]       = useState({ fullName: '', username: '', email: '', phone: '', licensePlate: '', status: 'regular' as 'regular' | 'vip', password: '' });
+  const [editForm, setEditForm]       = useState({ status: 'regular' as 'regular' | 'vip' });
   const [modal, setModal]             = useState<ModalState | null>(null);
   const { t } = useLanguage();
   const router = useRouter();
@@ -133,22 +133,19 @@ export default function UserManagement() {
 
   const startEditing = (user: User) => {
     setEditingId(user.id);
-    setEditForm({ fullName: user.fullName, username: user.username || '', email: user.email || '', phone: user.phone, licensePlate: user.licensePlate, status: user.status, password: '' });
+    setEditForm({ status: user.status });
   };
 
   const cancelEditing = () => {
     setEditingId(null);
-    setEditForm({ fullName: '', username: '', email: '', phone: '', licensePlate: '', status: 'regular', password: '' });
+    setEditForm({ status: 'regular' });
     setSaving(false);
   };
 
-  const handleEditChange = (field: keyof typeof editForm, value: string) =>
-    setEditForm((prev) => ({ ...prev, [field]: value }));
-
   const saveUser = async () => {
     if (editingId === null) return;
-    if (!editForm.fullName.trim() || !editForm.phone.trim() || !editForm.licensePlate.trim()) {
-      showModal({ message: t('user.validationError') || 'Please fill in required fields', confirmLabel: 'OK', hideCancel: true, confirmClassName: 'px-7 py-2.5 rounded-lg text-sm font-medium bg-emerald-600 text-white hover:bg-emerald-700 transition-colors', onConfirm: closeModal });
+    if (!editForm.status) {
+      showModal({ message: 'Please select a member status', confirmLabel: 'OK', hideCancel: true, confirmClassName: 'px-7 py-2.5 rounded-lg text-sm font-medium bg-emerald-600 text-white hover:bg-emerald-700 transition-colors', onConfirm: closeModal });
       return;
     }
     showModal({
@@ -160,22 +157,17 @@ export default function UserManagement() {
         setSaving(true);
         const payload: Record<string, string | number> = {
           id: editingId!,
-          full_name: editForm.fullName.trim(),
-          username: editForm.username.trim(),
-          email: editForm.email.trim(),
-          phone: editForm.phone.trim(),
-          license_plate: editForm.licensePlate.trim(),
           status: editForm.status,
         };
-        if (editForm.password.trim()) payload.password = editForm.password.trim();
         try {
           const res  = await fetch('/api/admin/users', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
           const data = await res.json();
           if (!res.ok || !data.success) throw new Error(data.error || 'Failed to update user');
+          const current = users.find(u => u.id === editingId);
           const updated: User = {
             id: data.data.id, fullName: data.data.full_name || '', username: data.data.username ?? null,
             email: data.data.email ?? null, phone: data.data.phone || '',
-            licensePlate: editForm.licensePlate.trim() || data.data.license_plate || '',
+            licensePlate: current?.licensePlate || '',
             joinDate: data.data.join_date || '', status: data.data.status?.toLowerCase() === 'vip' ? 'vip' : 'regular',
           };
           setUsers((prev) => prev.map((u) => (u.id === updated.id ? updated : u)));
@@ -290,49 +282,57 @@ export default function UserManagement() {
                 <table className="w-full border-collapse">
                   <thead className="bg-gray-100 sticky top-0 z-10">
                     <tr>
-                      {['user.fullName','user.username','user.email','user.phone','user.licensePlate','user.password','user.joinDate','user.status','user.actions'].map((k) => (
-                        <th key={k} className="px-6 py-4 text-left text-sm font-bold text-gray-800 border-r border-gray-300 last:border-r-0">{t(k)}</th>
+                      {['user.fullName','user.username','user.email','user.phone','user.licensePlate','user.joinDate'].map((k) => (
+                        <th key={k} className="px-6 py-4 text-left text-sm font-bold text-gray-800 border-r border-gray-300">{t(k)}</th>
                       ))}
+                      <th className="px-6 py-4 text-left text-sm font-bold text-gray-800 border-r border-gray-300">Member Status</th>
+                      <th className="px-6 py-4 text-left text-sm font-bold text-gray-800">{t('user.actions')}</th>
                     </tr>
                   </thead>
                   <tbody className="bg-white">
                     {filteredUsers.map((user) => (
                       <tr key={user.id} className={`border-b border-gray-200 hover:bg-gray-50 ${editingId === user.id ? 'bg-green-50' : ''}`}>
                         {/* fullName */}
-                        <td className="px-6 py-4 text-sm text-gray-900 border-r border-gray-200">
-                          {editingId === user.id ? <input type="text" value={editForm.fullName} onChange={(e) => handleEditChange('fullName', e.target.value)} className="w-full bg-transparent border-b border-gray-300 py-1 text-sm focus:border-green-500 focus:outline-none" /> : user.fullName}
-                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-900 border-r border-gray-200">{user.fullName}</td>
                         {/* username */}
                         <td className="px-6 py-4 text-sm text-gray-900 border-r border-gray-200">
-                          {editingId === user.id ? <input type="text" value={editForm.username} onChange={(e) => handleEditChange('username', e.target.value)} className="w-full bg-transparent border-b border-gray-300 py-1 text-sm focus:border-green-500 focus:outline-none" />
-                            : user.username ? user.username : <span className="text-gray-400">--</span>}
+                          {user.username ? user.username : <span className="text-gray-400">--</span>}
                         </td>
                         {/* email */}
                         <td className="px-6 py-4 text-sm text-gray-900 border-r border-gray-200">
-                          {editingId === user.id ? <input type="email" value={editForm.email} onChange={(e) => handleEditChange('email', e.target.value)} className="w-full bg-transparent border-b border-gray-300 py-1 text-sm focus:border-green-500 focus:outline-none" />
-                            : user.email ? user.email : <span className="text-gray-400">--</span>}
+                          {user.email ? user.email : <span className="text-gray-400">--</span>}
                         </td>
                         {/* phone */}
-                        <td className="px-6 py-4 text-sm text-gray-900 border-r border-gray-200">
-                          {editingId === user.id ? <input type="text" value={editForm.phone} onChange={(e) => handleEditChange('phone', e.target.value)} className="w-full bg-transparent border-b border-gray-300 py-1 text-sm focus:border-green-500 focus:outline-none" /> : user.phone}
-                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-900 border-r border-gray-200">{user.phone}</td>
                         {/* licensePlate */}
-                        <td className="px-6 py-4 text-sm text-gray-900 border-r border-gray-200">
-                          {editingId === user.id ? <input type="text" value={editForm.licensePlate} onChange={(e) => handleEditChange('licensePlate', e.target.value)} className="w-full bg-transparent border-b border-gray-300 py-1 text-sm focus:border-green-500 focus:outline-none" /> : user.licensePlate}
-                        </td>
-                        {/* password */}
-                        <td className="px-6 py-4 text-sm text-gray-900 border-r border-gray-200">
-                          {editingId === user.id ? <input type="password" value={editForm.password} placeholder={t('user.passwordPlaceholder') || 'New password (optional)'} onChange={(e) => handleEditChange('password', e.target.value)} className="w-full bg-transparent border-b border-gray-300 py-1 text-sm focus:border-green-500 focus:outline-none" /> : '******'}
-                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-900 border-r border-gray-200">{user.licensePlate}</td>
                         {/* joinDate */}
                         <td className="px-6 py-4 text-sm text-gray-900 border-r border-gray-200">{user.joinDate}</td>
-                        {/* status */}
+                        {/* Member Status */}
                         <td className="px-6 py-4 text-sm text-gray-900 border-r border-gray-200">
                           {editingId === user.id ? (
-                            <select value={editForm.status} onChange={(e) => handleEditChange('status', e.target.value)} className="w-full bg-transparent border-b border-gray-300 py-1 text-sm focus:border-green-500 focus:outline-none">
-                              <option value="regular">{t('user.regular')}</option>
-                              <option value="vip">{t('user.vip')}</option>
-                            </select>
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => setEditForm({ status: 'regular' })}
+                                className={`px-3 py-1.5 text-xs font-semibold rounded-lg border-2 transition-all ${
+                                  editForm.status === 'regular'
+                                    ? 'border-blue-500 bg-blue-50 text-blue-700'
+                                    : 'border-gray-200 bg-white text-gray-500 hover:border-gray-300'
+                                }`}
+                              >
+                                {t('user.regular')}
+                              </button>
+                              <button
+                                onClick={() => setEditForm({ status: 'vip' })}
+                                className={`px-3 py-1.5 text-xs font-semibold rounded-lg border-2 transition-all ${
+                                  editForm.status === 'vip'
+                                    ? 'border-amber-500 bg-amber-50 text-amber-700'
+                                    : 'border-gray-200 bg-white text-gray-500 hover:border-gray-300'
+                                }`}
+                              >
+                                {t('user.vip')}
+                              </button>
+                            </div>
                           ) : (
                             <span className={`px-3 py-1 text-sm font-medium rounded ${user.status === 'vip' ? 'text-red-800' : 'text-gray-800'}`}>
                               {user.status === 'vip' ? t('user.vip') : t('user.regular')}
@@ -351,9 +351,11 @@ export default function UserManagement() {
                               <button onClick={() => startEditing(user)} className="px-3 py-1 bg-blue-500 text-white rounded-lg hover:bg-blue-600 flex items-center space-x-1">
                                 <MaterialIcon name="edit" size="small" className="text-white" /><span>{t('common.edit')}</span>
                               </button>
-                              <button onClick={() => handleDelete(user.id)} disabled={deletingId === user.id} className="px-3 py-1 bg-red-500 text-white rounded-lg hover:bg-red-600 disabled:opacity-50 flex items-center space-x-1">
-                                {deletingId === user.id ? <span>...</span> : <><MaterialIcon name="delete" size="small" className="text-white" /><span>{t('common.delete')}</span></>}
-                              </button>
+                              {adminRole === 'superadmin' && (
+                                <button onClick={() => handleDelete(user.id)} disabled={deletingId === user.id} className="px-3 py-1 bg-red-500 text-white rounded-lg hover:bg-red-600 disabled:opacity-50 flex items-center space-x-1">
+                                  {deletingId === user.id ? <span>...</span> : <><MaterialIcon name="delete" size="small" className="text-white" /><span>{t('common.delete')}</span></>}
+                                </button>
+                              )}
                             </div>
                           )}
                         </td>

@@ -15,6 +15,7 @@ interface ModalState {
   confirmClassName?: string;
   hideCancel?: boolean;
   onConfirm: () => void;
+  onCancel?: () => void;
 }
 
 function ConfirmModal({ message, warning, confirmLabel = 'OK', confirmClassName, hideCancel, onConfirm, onCancel }: ModalState & { onCancel: () => void }) {
@@ -118,11 +119,113 @@ export default function AdminManagement() {
   }, []);
 
   const startEditing = (admin: Admin) => {
+    // If already editing another row, ask to save first
+    if (editingId !== null && editingId !== admin.id) {
+      const currentAdmin = admins.find(a => a.id === editingId);
+      const hasChanges = currentAdmin && (
+        editForm.fullName !== currentAdmin.fullName ||
+        editForm.username !== currentAdmin.username ||
+        editForm.email !== currentAdmin.email ||
+        editForm.phoneNumber !== currentAdmin.phoneNumber ||
+        editForm.password.trim() !== '' ||
+        editForm.role !== (currentAdmin.role || 'admin')
+      );
+
+      if (hasChanges) {
+        showModal({
+          message: 'You have unsaved changes. Would you like to save them before editing another admin?',
+          confirmLabel: 'Save',
+          confirmClassName: 'px-7 py-2.5 rounded-lg text-sm font-medium bg-emerald-600 text-white hover:bg-emerald-700 transition-colors',
+          onCancel: () => {
+            closeModal();
+            setEditingId(admin.id);
+            setEditForm({ fullName: admin.fullName, username: admin.username, email: admin.email, phoneNumber: admin.phoneNumber, password: '', role: admin.role || 'admin' });
+          },
+          onConfirm: async () => {
+            closeModal();
+            // Save current, then switch
+            setSaving(true);
+            const payload: Record<string, string | number> = { id: editingId!, fullName: editForm.fullName.trim(), username: editForm.username.trim(), email: editForm.email.trim(), phoneNumber: editForm.phoneNumber.trim() };
+            if (editForm.password.trim()) { payload.password = editForm.password.trim(); }
+            const isRootAdmin = adminId === 1;
+            const targetAdmin = admins.find(a => a.id === editingId);
+            if (isRootAdmin && targetAdmin && targetAdmin.id !== 1) {
+              payload.role = editForm.role;
+            }
+            try {
+              const res = await fetch('/api/admin/admins', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify(payload) });
+              const data = await res.json();
+              if (!res.ok || !data.success) throw new Error(data.error || 'Failed to update admin');
+              setAdmins((prev) => prev.map((a) => (a.id === editingId ? data.admin : a)));
+            } catch (err) {
+              showModal({ message: (err as Error).message || 'Failed to save', confirmLabel: 'OK', hideCancel: true, confirmClassName: 'px-7 py-2.5 rounded-lg text-sm font-medium bg-red-600 text-white hover:bg-red-700 transition-colors', onConfirm: closeModal });
+              return;
+            } finally {
+              setSaving(false);
+            }
+            // Now switch to new row
+            setEditingId(admin.id);
+            setEditForm({ fullName: admin.fullName, username: admin.username, email: admin.email, phoneNumber: admin.phoneNumber, password: '', role: admin.role || 'admin' });
+          },
+        });
+        return;
+      }
+    }
+
     setEditingId(admin.id);
     setEditForm({ fullName: admin.fullName, username: admin.username, email: admin.email, phoneNumber: admin.phoneNumber, password: '', role: admin.role || 'admin' });
   };
 
   const cancelEditing = () => {
+    const currentAdmin = admins.find(a => a.id === editingId);
+    const hasChanges = currentAdmin && (
+      editForm.fullName !== currentAdmin.fullName ||
+      editForm.username !== currentAdmin.username ||
+      editForm.email !== currentAdmin.email ||
+      editForm.phoneNumber !== currentAdmin.phoneNumber ||
+      editForm.password.trim() !== '' ||
+      editForm.role !== (currentAdmin.role || 'admin')
+    );
+
+    if (hasChanges) {
+      showModal({
+        message: 'You have unsaved changes. Would you like to save them before cancelling?',
+        confirmLabel: 'Save',
+        confirmClassName: 'px-7 py-2.5 rounded-lg text-sm font-medium bg-emerald-600 text-white hover:bg-emerald-700 transition-colors',
+        onCancel: () => {
+          closeModal();
+          setEditingId(null);
+          setEditForm({ fullName: '', username: '', email: '', phoneNumber: '', password: '', role: 'admin' });
+          setSaving(false);
+        },
+        onConfirm: async () => {
+          closeModal();
+          setSaving(true);
+          const payload: Record<string, string | number> = { id: editingId!, fullName: editForm.fullName.trim(), username: editForm.username.trim(), email: editForm.email.trim(), phoneNumber: editForm.phoneNumber.trim() };
+          if (editForm.password.trim()) { payload.password = editForm.password.trim(); }
+          const isRoot = adminId === 1;
+          const targetAdmin = admins.find(a => a.id === editingId);
+          if (isRoot && targetAdmin && targetAdmin.id !== 1) {
+            payload.role = editForm.role;
+          }
+          try {
+            const res = await fetch('/api/admin/admins', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify(payload) });
+            const data = await res.json();
+            if (!res.ok || !data.success) throw new Error(data.error || 'Failed to update admin');
+            setAdmins((prev) => prev.map((a) => (a.id === editingId ? data.admin : a)));
+          } catch (err) {
+            showModal({ message: (err as Error).message || 'Failed to save', confirmLabel: 'OK', hideCancel: true, confirmClassName: 'px-7 py-2.5 rounded-lg text-sm font-medium bg-red-600 text-white hover:bg-red-700 transition-colors', onConfirm: closeModal });
+            return;
+          } finally {
+            setSaving(false);
+          }
+          setEditingId(null);
+          setEditForm({ fullName: '', username: '', email: '', phoneNumber: '', password: '', role: 'admin' });
+        },
+      });
+      return;
+    }
+
     setEditingId(null);
     setEditForm({ fullName: '', username: '', email: '', phoneNumber: '', password: '', role: 'admin' });
     setSaving(false);
@@ -153,6 +256,11 @@ export default function AdminManagement() {
     if (editingId === null) return;
     if (!editForm.fullName.trim() || !editForm.username.trim() || !editForm.email.trim() || !editForm.phoneNumber.trim()) {
       showModal({ message: t('admin.error') || 'Please fill in all required fields', confirmLabel: 'OK', hideCancel: true, confirmClassName: 'px-7 py-2.5 rounded-lg text-sm font-medium bg-emerald-600 text-white hover:bg-emerald-700 transition-colors', onConfirm: closeModal });
+      return;
+    }
+    const editError = validateAdminInput({ username: editForm.username, password: editForm.password, phoneNumber: editForm.phoneNumber.trim() }, false, editingId);
+    if (editError) {
+      showModal({ message: editError, confirmLabel: 'OK', hideCancel: true, confirmClassName: 'px-7 py-2.5 rounded-lg text-sm font-medium bg-red-600 text-white hover:bg-red-700 transition-colors', onConfirm: closeModal });
       return;
     }
     showModal({
@@ -208,11 +316,43 @@ export default function AdminManagement() {
     });
   };
 
+  const validateAdminInput = (data: { username?: string; phoneNumber?: string; password?: string }, isNew: boolean, excludeId?: number | null) => {
+    // Username duplicate check
+    if (data.username) {
+      const exists = admins.some(a => a.id !== excludeId && a.username.toLowerCase() === data.username!.trim().toLowerCase());
+      if (exists) return 'Username already exists';
+    }
+
+    // Phone: exactly 10 digits
+    if (data.phoneNumber !== undefined) {
+      if (!/^\d{10}$/.test(data.phoneNumber.trim())) return 'Phone number must be exactly 10 digits';
+    }
+
+    // Password: 6-20 chars, at least one special character
+    if (data.password !== undefined && data.password.trim()) {
+      const pw = data.password.trim();
+      if (pw.length < 6 || pw.length > 20) return 'Password must be between 6 and 20 characters';
+      if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?`~]/.test(pw)) return 'Password must contain at least one special character';
+    }
+
+    // For new admin, password is required
+    if (isNew && (!data.password || !data.password.trim())) return 'Password is required';
+
+    return null;
+  };  
+
   const handleAddAdmin = async () => {
     if (!addForm.username.trim() || !addForm.fullName.trim() || !addForm.email.trim() || !addForm.phoneNumber.trim() || !addForm.password.trim()) {
       showModal({ message: 'All fields are required', confirmLabel: 'OK', hideCancel: true, confirmClassName: 'px-7 py-2.5 rounded-lg text-sm font-medium bg-emerald-600 text-white hover:bg-emerald-700 transition-colors', onConfirm: closeModal });
       return;
     }
+
+    const addError = validateAdminInput({ username: addForm.username, phoneNumber: addForm.phoneNumber, password: addForm.password }, true);
+    if (addError) {
+      showModal({ message: addError, confirmLabel: 'OK', hideCancel: true, confirmClassName: 'px-7 py-2.5 rounded-lg text-sm font-medium bg-red-600 text-white hover:bg-red-700 transition-colors', onConfirm: closeModal });
+      return;
+    }
+
     showModal({
       message: `Create new admin "${addForm.username.trim()}"?`,
       confirmLabel: 'Create',
@@ -293,8 +433,15 @@ export default function AdminManagement() {
               <div className="px-3 pb-3 flex-shrink-0">
                 <div className="border border-emerald-200 bg-emerald-50/50 rounded-xl p-4">
                   <h3 className="text-sm font-bold text-emerald-800 mb-3">Create New Admin</h3>
+                  {/* Hidden dummy fields to absorb browser autofill */}
+                  <input type="text" name="fake-user" style={{ display: 'none' }} tabIndex={-1} />
+                  <input type="password" name="fake-pass" style={{ display: 'none' }} tabIndex={-1} />
                   <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
-                    <input type="text" placeholder="Username" value={addForm.username} onChange={(e) => setAddForm(p => ({ ...p, username: e.target.value }))}
+                    <input type="text" placeholder="Username" value={addForm.username}
+                      readOnly
+                      onFocus={(e) => e.target.removeAttribute('readOnly')}
+                      onChange={(e) => setAddForm(p => ({ ...p, username: e.target.value }))}
+                      autoComplete="username"
                       className="px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500" />
                     <input type="text" placeholder="Full Name" value={addForm.fullName} onChange={(e) => setAddForm(p => ({ ...p, fullName: e.target.value }))}
                       className="px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500" />
@@ -302,7 +449,11 @@ export default function AdminManagement() {
                       className="px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500" />
                     <input type="text" placeholder="Phone (10 digits)" value={addForm.phoneNumber} onChange={(e) => setAddForm(p => ({ ...p, phoneNumber: e.target.value }))}
                       className="px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500" />
-                    <input type="password" placeholder="Password (6-20 chars)" value={addForm.password} onChange={(e) => setAddForm(p => ({ ...p, password: e.target.value }))}
+                    <input type="password" placeholder="Password (6-20 chars)" value={addForm.password}
+                      readOnly
+                      onFocus={(e) => e.target.removeAttribute('readOnly')}
+                      onChange={(e) => setAddForm(p => ({ ...p, password: e.target.value }))}
+                      autoComplete="new-password"
                       className="px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500" />
                     <button onClick={handleAddAdmin} disabled={addSaving}
                       className="px-4 py-2 bg-emerald-600 text-white text-sm font-semibold rounded-lg hover:bg-emerald-700 transition-colors disabled:opacity-50">
@@ -329,44 +480,64 @@ export default function AdminManagement() {
                 <div className="flex items-center justify-center h-full"><p className="text-lg font-semibold text-gray-500">{t('admin.noAdmins')}</p></div>
               ) : (
                 <table className="w-full border-collapse">
-                  <thead className="bg-gray-100 sticky top-0 z-10">
+                  <thead className="bg-gray-100 sticky top- z-10 border-y border-gray-200">
                     <tr>
                       {['admin.fullName','admin.username','admin.email','admin.phone','admin.password','admin.joinDate'].map((k) => (
-                        <th key={k} className="px-6 py-4 text-left text-sm font-bold text-gray-800 border-r border-gray-300">{t(k)}</th>
+                        <th key={k} className="px-6 py-4 text-left text-sm font-bold text-gray-800 border-r border-gray-200">{t(k)}</th>
                       ))}
-                      <th className="px-6 py-4 text-left text-sm font-bold text-gray-800 border-r border-gray-300">Role</th>
+                      <th className="px-6 py-4 text-left text-sm font-bold text-gray-800 border-r border-gray-200">Role</th>
                       <th className="px-6 py-4 text-left text-sm font-bold text-gray-800">{t('admin.actions')}</th>
                     </tr>
                   </thead>
                   <tbody className="bg-white">
                     {admins.map((admin, idx) => (
-                      <tr key={admin.id ?? idx} className={`border-b border-gray-200 hover:bg-gray-50 ${editingId === admin.id ? 'bg-green-50' : ''}`}>
+                      <tr key={admin.id ?? idx} className={`border-b border-gray-200 ${editingId === admin.id ? 'bg-blue-50' : editingId === null ? 'hover:bg-gray-50' : ''}`}>
                         {(['fullName','username','email','phoneNumber'] as const).map((field) => (
                           <td key={field} className="px-6 py-4 text-sm text-gray-900 border-r border-gray-200">
                             {editingId === admin.id ? (
                               <input type={field === 'email' ? 'email' : 'text'} value={editForm[field]} onChange={(e) => handleEditChange(field, e.target.value)}
-                                className="w-full bg-transparent border-b border-gray-300 py-1 text-sm focus:border-green-500 focus:outline-none" />
+                                className="w-full bg-transparent border-b border-gray-300 py-1 text-sm focus:border-blue-500 focus:outline-none" />
                             ) : admin[field]}
                           </td>
                         ))}
                         <td className="px-6 py-4 text-sm text-gray-900 border-r border-gray-200">
                           {editingId === admin.id ? (
                             <input type="password" value={editForm.password} placeholder={t('admin.passwordPlaceholder') || 'New password (optional)'} onChange={(e) => handleEditChange('password', e.target.value)}
-                              className="w-full bg-transparent border-b border-gray-300 py-1 text-sm focus:border-green-500 focus:outline-none" />
+                              autoComplete="new-password"
+                              className="w-full bg-transparent border-b border-gray-300 py-1 text-sm focus:border-blue-500 focus:outline-none" />
                           ) : admin.password}
                         </td>
                         <td className="px-6 py-4 text-sm text-gray-900 border-r border-gray-200">{admin.joinDate}</td>
                         {/* Role column */}
                         <td className="px-6 py-4 text-sm text-gray-900 border-r border-gray-200">
                           {editingId === admin.id && canEditRole(admin) ? (
-                            <select value={editForm.role} onChange={(e) => handleEditChange('role', e.target.value)}
-                              className="w-full bg-transparent border-b border-gray-300 py-1 text-sm focus:border-green-500 focus:outline-none">
-                              <option value="admin">Admin</option>
-                              <option value="superadmin">Super Admin</option>
-                            </select>
+                            <div className="flex gap-2">
+                              <button
+                                type="button"
+                                onClick={() => handleEditChange('role', 'admin')}
+                                className={`px-3 py-1.5 text-xs font-semibold rounded-lg border-2 transition-all ${
+                                  editForm.role === 'admin'
+                                    ? 'border-green-500 bg-green-100 text-green-700'
+                                    : 'border-green-200 bg-white text-green-400 hover:border-green-400'
+                                }`}
+                              >
+                                Admin
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleEditChange('role', 'superadmin')}
+                                className={`px-3 py-1.5 text-xs font-semibold rounded-lg border-2 transition-all ${
+                                  editForm.role === 'superadmin'
+                                    ? 'border-purple-500 bg-purple-50 text-purple-700'
+                                    : 'border-purple-200 bg-white text-purple-400 hover:border-purple-400'
+                                }`}
+                              >
+                                Super Admin
+                              </button>
+                            </div>
                           ) : (
                             <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold ${
-                              admin.role === 'superadmin' ? 'bg-purple-100 text-purple-700 border border-purple-300' : 'bg-gray-100 text-gray-600 border border-gray-300'
+                              admin.role === 'superadmin' ? 'bg-purple-100 text-purple-700 border border-purple-300' : 'bg-green-100 text-green-700 border border-green-300'
                             }`}>
                               {admin.role === 'superadmin' ? 'Super Admin' : 'Admin'}
                             </span>
@@ -382,8 +553,8 @@ export default function AdminManagement() {
                                 <span>{saving ? `${t('common.save')}...` : t('common.save')}</span>
                               </button>
                               <button onClick={cancelEditing}
-                                className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-gray-300 bg-gray-100 text-gray-700 text-xs font-semibold rounded-lg hover:bg-gray-200 transition-colors">
-                                <MaterialIcon name="close" size="small" className="text-gray-700" />
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-red-200 bg-red-50 text-red-700 text-xs font-semibold rounded-lg hover:bg-red-100 transition-colors">
+                                <MaterialIcon name="close" size="small" className="text-red-700" />
                                 <span>{t('common.cancel')}</span>
                               </button>
                             </div>
@@ -415,7 +586,7 @@ export default function AdminManagement() {
         </div>
       </div>
 
-      {modal && <ConfirmModal {...modal} onCancel={closeModal} />}
+      {modal && <ConfirmModal {...modal} onCancel={modal.onCancel || closeModal} />}
     </div>
   );
 }

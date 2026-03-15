@@ -79,7 +79,7 @@ export default function Login() {
             </div>
           )}
 
-          <form className="space-y-5" onSubmit={handleSubmit} autoComplete="off">
+          <form className="space-y-5" onSubmit={handleSubmit} autoComplete="on">
             {/* Username */}
             <div>
               <label className="mb-1 block text-sm font-medium text-gray-700">
@@ -87,7 +87,7 @@ export default function Login() {
               </label>
               <input
                 type="text"
-                autoComplete="off"
+                autoComplete="username"
                 placeholder="Enter your username"
                 value={loginData.username}
                 onChange={(e) => handleChange("username", e.target.value)}
@@ -107,7 +107,7 @@ export default function Login() {
               </label>
               <input
                 type="password"
-                autoComplete="new-password"
+                autoComplete="current-password"
                 placeholder="Enter your password"
                 value={loginData.password}
                 onChange={(e) => handleChange("password", e.target.value)}
